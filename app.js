@@ -1315,7 +1315,9 @@
           showToast(humanError('push_not_supported'));
           return;
         }
-        serviceWorkerReadyPromise.then(function() {
+        serviceWorkerReadyPromise.catch(function() {
+          return null;
+        }).then(function() {
           logPushDiagnostic(OneSignal, 'permission_request_start');
           return requestNotificationPermissionWithFallback(OneSignal);
         }).then(function(permission) {
@@ -1349,10 +1351,14 @@
           autoResubscribe: true,
           allowLocalhostAsSecureOrigin: true
         }).then(function() {
-          serviceWorkerReadyPromise = waitForServiceWorkerReady(OneSignal, 'after_onesignal_init');
+          serviceWorkerReadyPromise = waitForServiceWorkerReady(OneSignal, 'after_onesignal_init').catch(function() {
+            return null;
+          });
           attachPushSubscriptionListener(OneSignal);
           identifyOneSignalUser(OneSignal);
-          return serviceWorkerReadyPromise.catch(function() { return null; });
+          return registerCurrentPushDevice(OneSignal).catch(function() {
+            return null;
+          });
         }).catch(function(err) {
           logPushDiagnostic(OneSignal, err && err.message ? 'onesignal_init_or_ready_failed:' + err.message : 'onesignal_init_or_ready_failed');
           return null;
@@ -1400,6 +1406,10 @@
     function waitForServiceWorkerReady(OneSignal, reason) {
       if (!('serviceWorker' in navigator)) return Promise.reject(new Error('service_worker_missing'));
       logPushDiagnostic(OneSignal, 'service_worker_wait:' + reason);
+      if (OneSignal && OneSignal.User && OneSignal.User.PushSubscription && OneSignal.User.PushSubscription.id) {
+        logPushDiagnostic(OneSignal, 'service_worker_bypassed_subscription_present:' + reason);
+        return Promise.resolve(null);
+      }
       return withTimeout(navigator.serviceWorker.ready, 9000, 'service_worker_ready_timeout')
         .then(function(registration) {
           logPushDiagnostic(OneSignal, 'service_worker_ready:' + reason);
