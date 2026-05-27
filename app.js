@@ -101,11 +101,10 @@
     }
 
     function setupMobileViewport() {
-      const viewportWidth = Math.max(320, window.innerWidth || document.documentElement.clientWidth || 390);
-      const physicalWidth = Math.max(320, window.screen && window.screen.width || viewportWidth);
-      const scale = Math.max(1, Math.min(2.6, viewportWidth / Math.min(430, physicalWidth)));
-      document.documentElement.style.setProperty('--app-mobile-scale', scale.toFixed(3));
-      document.documentElement.style.setProperty('--app-layout-width', (viewportWidth / scale).toFixed(2) + 'px');
+      // Postmark redesign: no scale hack. Rely on responsive CSS so position:fixed
+      // (tabbar, fab, sheets) is not trapped inside a transformed containing block.
+      document.documentElement.style.removeProperty('--app-mobile-scale');
+      document.documentElement.style.removeProperty('--app-layout-width');
     }
 
     function setupSplash() {
@@ -284,26 +283,25 @@
     function renderUnauthorized() {
       root.innerHTML = [
         '<section class="phase-card">',
-        '<p class="eyebrow">Not authorized</p>',
-        '<h1>Us</h1>',
-        '<p>This private app is only available to the two configured Google accounts.</p>',
-        '<div class="meta"><span>Sign in with the correct Google account, then reload this page.</span></div>',
+        '<div class="eyebrow"><span>— private</span><span>access denied</span></div>',
+        '<h1>Us.</h1>',
+        '<p>this letter is only for two pairs of eyes. sign in with the right account.</p>',
+        '<div class="meta">sign in · then reload</div>',
         '</section>'
       ].join('');
     }
 
     function renderExternalLogin(message) {
       root.innerHTML = [
-        '<section class="phone-shell external-login">',
-        '<header class="app-header"><span class="app-mark">R&amp;M</span><strong>Us</strong></header>',
-        '<section class="card">',
-        '<p class="eyebrow">Private access</p>',
-        '<h2>Open Us</h2>',
-        '<p>Paste your personal frontend token once. It stays on this device.</p>',
+        '<section class="external-login">',
+        '<div class="card">',
+        '<div class="eyebrow"><span>— open us</span></div>',
+        '<h2>a private letter.</h2>',
+        '<p>paste your token once. it stays on this device.</p>',
         message ? '<p class="form-error">' + escapeHtml(message) + '</p>' : '',
-        '<input id="frontend-token" class="text-input" type="password" autocomplete="off" placeholder="Frontend token">',
+        '<input id="frontend-token" class="text-input" type="password" autocomplete="off" placeholder="frontend token">',
         '<button type="button" class="primary wide" data-action="save-frontend-token">Continue</button>',
-        '</section>',
+        '</div>',
         '</section>'
       ].join('');
 
@@ -322,14 +320,13 @@
     function render() {
       root.innerHTML = [
         '<section class="phone-shell">',
-        '<header class="app-header"><span class="app-mark">R&amp;M</span><strong>Us</strong></header>',
         renderClockStrip(),
-        '<div class="screen">',
+        '<div class="screen screen-' + state.activeTab + '">',
         renderActiveTab(),
         '</div>',
+        '</section>',
         renderTabs(),
         state.activeTab === 'feed' ? '<button class="fab" data-action="open-composer" aria-label="Create post">+</button>' : '',
-        '</section>',
         state.composer.open ? renderComposer() : '',
         state.error ? '<div class="toast">' + escapeHtml(state.error) + '</div>' : ''
       ].join('');
@@ -351,26 +348,26 @@
       ];
       return '<div class="clock-strip">' + clocks.map(function(clock) {
         const weather = clock.weather ? ' · ' + clock.weather.temperatureC + '°C ' + clock.weather.summary : '';
-        return '<span>' + escapeHtml(clock.name) + ' ' + escapeHtml(clock.time + weather) + '</span>';
-      }).join('<span class="dot">.</span>') + '</div>';
+        return '<span class="clock"><em>' + escapeHtml(clock.name) + '</em> ' + escapeHtml(clock.time + weather) + '</span>';
+      }).join('<span class="dot" aria-hidden="true"></span>') + '</div>';
     }
 
     function renderToday() {
       if (state.loading && !state.today) {
         return [
           '<div class="hero-skeleton"></div>',
-          '<div class="card skeleton-card"></div>',
-          '<div class="button-row"><div class="button-skeleton"></div><div class="button-skeleton"></div></div>'
+          '<div class="block"><div class="button-row"><div class="button-skeleton"></div><div class="button-skeleton"></div></div></div>',
+          '<div class="skeleton-card"></div>'
         ].join('');
       }
 
       const today = state.today;
       if (!today) {
-        return '<div class="card"><h2>Today</h2><p>Could not load today yet.</p><button class="primary" data-action="reload">Try again</button></div>';
+        return '<section class="block"><h2 class="q-title" style="font-family:var(--font-serif);font-style:italic;font-size:32px;color:var(--ink);margin-bottom:14px;">Today</h2><p class="hint">Could not load today yet.</p><button class="primary wide" data-action="reload" style="margin-top:14px;">Try again</button></section>';
       }
 
       return [
-        renderCountdown(today.nextReunion),
+        renderCountdown(today.nextReunion, today),
         renderRelationshipStats(today),
         renderNotificationBanner(today),
         renderQuestionCard(today),
@@ -384,14 +381,16 @@
       if (!state.ui.showNotificationBanner) return '';
       const partner = today && today.otherUser ? today.otherUser.name : 'Rui';
       return [
-        '<section class="inline-banner notification-banner">',
+        '<section class="block">',
+        '<div class="inline-banner notification-banner">',
         '<div class="notification-copy">',
-        '<strong>Notifications</strong>',
-        '<p>Get notified when ' + escapeHtml(partner) + ' posts.</p>',
+        '<strong>— Notifications</strong>',
+        '<p>Hear from ' + escapeHtml(partner) + ' the moment something arrives.</p>',
         '</div>',
         '<div class="notification-actions">',
-        '<button type="button" class="mini-action notification-enable" data-action="enable-notifications">Enable notifications</button>',
+        '<button type="button" class="mini-action notification-enable" data-action="enable-notifications">Enable</button>',
         '<button type="button" class="mini-action muted" data-action="dismiss-notifications">Not now</button>',
+        '</div>',
         '</div>',
         '</section>'
       ].join('');
@@ -400,26 +399,52 @@
     function renderInstallTip() {
       if (!state.ui.showInstallTip) return '';
       return [
-        '<section class="install-tip">',
-        '<p>Tap Share → Add to Home Screen to install Us as an app.</p>',
+        '<section class="block">',
+        '<div class="install-tip">',
+        '<p>Tap Share → Add to Home Screen to keep <em style="font-family:var(--font-serif);">Us</em> close.</p>',
         '<button class="text-action" data-action="dismiss-install-tip">dismiss</button>',
+        '</div>',
         '</section>'
       ].join('');
     }
 
-    function renderCountdown(nextReunion) {
+    function renderCountdown(nextReunion, today) {
+      const dateLine = today && today.user ? formatHumanDate(state.today && state.today.date) : '';
+      const dayOfUs = today && today.relationshipStats && today.relationshipStats.daysTogether != null
+        ? 'day ' + escapeHtml(today.relationshipStats.daysTogether) + ' of us'
+        : '';
+      const stamp = dateLine
+        ? '<div class="band-stamp">' + escapeHtml(dateLine) + '</div>'
+        : '';
+
       if (!nextReunion) {
         return [
-          '<section class="today-hero">',
-          '<span class="hero-number">-</span>',
-          '<span class="hero-label">next reunion not set yet</span>',
+          '<section class="postmark-band empty">',
+          stamp,
+          '<div class="band-eyebrow">until —</div>',
+          '<div class="band-hero">',
+          '<span class="hero-number">soon</span>',
+          '<div class="hero-label">no reunion <strong>set</strong> yet — plan it.</div>',
+          dayOfUs ? '<div class="hero-sub">' + dayOfUs + '</div>' : '',
+          '</div>',
           '</section>'
         ].join('');
       }
+
+      const place = nextReunion.location || nextReunion.title || 'next reunion';
+      const days = nextReunion.daysUntil == null ? '—' : nextReunion.daysUntil;
+      const arrival = nextReunion.startDate ? 'arr. ' + escapeHtml(formatHumanDate(nextReunion.startDate)) : '';
+      const sub = [arrival, dayOfUs].filter(Boolean).join(' · ');
+
       return [
-        '<section class="today-hero">',
-        '<span class="hero-number">' + escapeHtml(nextReunion.daysUntil == null ? '-' : nextReunion.daysUntil) + '</span>',
-        '<span class="hero-label">days until ' + escapeHtml(nextReunion.location || nextReunion.title || 'next reunion') + '</span>',
+        '<section class="postmark-band">',
+        stamp,
+        '<div class="band-eyebrow">until —</div>',
+        '<div class="band-hero">',
+        '<span class="hero-number">' + escapeHtml(days) + '</span>',
+        '<div class="hero-label">days until <strong>' + escapeHtml(place) + '</strong></div>',
+        sub ? '<div class="hero-sub">' + sub + '</div>' : '',
+        '</div>',
         '</section>'
       ].join('');
     }
@@ -427,26 +452,26 @@
     function renderQuestionCard(today) {
       const question = today.question || {};
       const disabled = today.answered.me || question.locked;
-      const answerCopy = today.answered.other ? today.otherUser.name + ' already answered' : today.otherUser.name + ' has not answered yet';
+      const answerCopy = today.answered.other ? today.otherUser.name + ' already wrote back' : today.otherUser.name + ' hasn\u2019t answered yet';
       const textarea = today.answered.me
-        ? '<p class="answered-note">You answered today.</p>'
-        : '<textarea id="answer" rows="5" placeholder="Write your answer..." ' + (disabled ? 'disabled' : '') + '></textarea>';
+        ? '<p class="answered-note">— you answered today.</p>'
+        : '<textarea id="answer" rows="5" placeholder="begin softly..." ' + (disabled ? 'disabled' : '') + '></textarea>';
       const button = today.answered.me
         ? ''
-        : '<button class="primary" data-action="submit-answer" ' + (disabled ? 'disabled' : '') + '>Submit</button>';
+        : '<button class="primary wide" data-action="submit-answer" ' + (disabled ? 'disabled' : '') + '>Send</button>';
 
       const answers = today.answers && state.ui.revealAnswers ? renderAnswers(today.answers) : '';
       const revealPrompt = today.answers && !state.ui.revealAnswers
-        ? '<button class="secondary wide" data-action="reveal-answers">Both done. Tap to reveal.</button>'
+        ? '<button class="link-row" data-action="reveal-answers">Both answered — open the letters</button>'
         : '';
 
       return [
-        '<section class="card question-card">',
-        '<div class="card-heading">',
-        "<span>Today's question</span>",
-        '<small>' + escapeHtml(question.category || '') + '</small>',
+        '<section class="block question-card">',
+        '<div class="eyebrow">',
+        "<span>Today\u2019s question · " + escapeHtml(question.category || 'daily') + '</span>',
+        '<span>·</span>',
         '</div>',
-        '<h2>' + escapeHtml(question.text || '') + '</h2>',
+        '<h2>' + formatQuestionText(question.text || '') + '</h2>',
         textarea,
         button,
         '<p class="hint">' + escapeHtml(answerCopy) + '</p>',
@@ -460,14 +485,14 @@
       const stats = today.relationshipStats;
       if (!stats) return '';
       const milestone = stats.nextMilestone
-        ? '<span>' + escapeHtml(stats.nextMilestone.label) + ' in ' + escapeHtml(stats.nextMilestone.daysUntil) + ' days</span>'
+        ? '<div class="milestone">— ' + escapeHtml(stats.nextMilestone.label) + ' in <strong style="font-style:normal;color:var(--mark);">' + escapeHtml(stats.nextMilestone.daysUntil) + '</strong> days</div>'
         : '';
       return [
         '<section class="stats-strip">',
-        '<span><strong>' + escapeHtml(stats.daysTogether == null ? '-' : stats.daysTogether) + '</strong> days together</span>',
-        '<span><strong>' + escapeHtml(today.answerStreak || 0) + '</strong> answer streak</span>',
+        '<div class="stat"><strong>' + escapeHtml(stats.daysTogether == null ? '—' : stats.daysTogether) + '</strong><span>days together</span></div>',
+        '<div class="stat"><strong>' + escapeHtml(today.answerStreak || 0) + '</strong><span>answer streak</span></div>',
         milestone,
-        '<button class="mini-action" data-action="thinking-of-you">Thinking of you</button>',
+        '<div class="thinking"><button data-action="thinking-of-you">Thinking of you</button></div>',
         '</section>'
       ].join('');
     }
@@ -477,8 +502,8 @@
       const photos = dailyPhoto.photos || [];
       const reveal = photos.length >= 2;
       return [
-        '<section class="card daily-photo-card">',
-        '<div class="card-heading"><span>Daily photo</span><small>' + escapeHtml(dailyPhoto.date || '') + '</small></div>',
+        '<section class="block daily-photo-card">',
+        '<div class="eyebrow"><span>Daily photo</span><span>' + escapeHtml(dailyPhoto.date || '') + '</span></div>',
         reveal ? '<div class="daily-photo-grid">' + photos.map(function(photo) {
           return [
             '<figure>',
@@ -486,9 +511,9 @@
             '<figcaption>' + escapeHtml(photo.name) + '</figcaption>',
             '</figure>'
           ].join('');
-        }).join('') + '</div>' : '<p class="hint">' + (dailyPhoto.meSubmitted ? 'Your photo is in. Waiting for the other one.' : "Add today's quick photo. It reveals when both are in.") + '</p>',
+        }).join('') + '</div>' : '<p class="hint">' + (dailyPhoto.meSubmitted ? '— your photo is in. waiting for the other.' : 'add today\u2019s photo. it reveals when both arrive.') + '</p>',
         '<input id="daily-photo-input" type="file" accept="image/*" capture="environment">',
-        '<button class="secondary wide" data-action="submit-daily-photo">' + (dailyPhoto.meSubmitted ? "Replace today's photo" : "Add today's photo") + '</button>',
+        '<button class="secondary wide" data-action="submit-daily-photo">' + (dailyPhoto.meSubmitted ? "Replace today\u2019s photo" : "Add today\u2019s photo") + '</button>',
         '</section>'
       ].join('');
     }
@@ -511,27 +536,29 @@
     function renderStatusButtons(today) {
       const latest = latestStatusText(today.status || []);
       return [
-        '<section class="status-panel">',
+        '<section class="block status-panel">',
+        '<div class="eyebrow"><span>Status</span><span>·</span></div>',
         '<div class="button-row">',
-        '<button class="secondary" data-action="status" data-type="morning">Good morning</button>',
-        '<button class="secondary" data-action="status" data-type="night">Good night</button>',
+        '<button class="secondary" data-action="status" data-type="morning">good morning ☀</button>',
+        '<button class="secondary" data-action="status" data-type="night">good night ☽</button>',
         '</div>',
-        latest ? '<p class="hint">' + escapeHtml(latest) + '</p>' : '<p class="hint">No status shared today yet.</p>',
+        latest ? '<p class="hint">' + escapeHtml(latest) + '</p>' : '<p class="hint">— no notes today yet.</p>',
         '</section>'
       ].join('');
     }
 
     function renderFeed() {
       if (state.feed.loading && !state.feed.loaded) {
-        return '<section class="feed-list"><div class="card skeleton-card"></div><div class="card skeleton-card"></div></section>';
+        return '<section class="feed-list"><div class="skeleton-card" style="margin:0;height:200px;"></div><div class="skeleton-card" style="margin:0;height:160px;"></div></section>';
       }
 
       if (!state.feed.items.length) {
         return [
           '<section class="empty-feed">',
-          '<h2>Feed</h2>',
-          '<p>Nothing here yet. You go first.</p>',
-          '<button class="primary" data-action="open-composer">Create first post</button>',
+          '<div class="eyebrow" style="justify-content:center;"><span>— the feed</span></div>',
+          '<h2>nothing here yet.</h2>',
+          '<p>you write the first letter.</p>',
+          '<button class="primary" data-action="open-composer">Write something</button>',
           '</section>'
         ].join('');
       }
@@ -539,8 +566,8 @@
       return [
         '<section class="feed-list">',
         state.feed.items.map(renderFeedPost).join(''),
-        state.feed.loadingMore ? '<p class="hint feed-loading">Loading more...</p>' : '',
-        !state.feed.hasMore ? '<p class="hint feed-loading">You are caught up.</p>' : '',
+        state.feed.loadingMore ? '<p class="feed-loading">— loading more</p>' : '',
+        !state.feed.hasMore ? '<p class="feed-loading">— caught up</p>' : '',
         '</section>'
       ].join('');
     }
@@ -550,12 +577,12 @@
         '<article class="feed-post" data-post-id="' + escapeHtml(post.id) + '">',
         '<header class="post-header">',
         '<span class="avatar">' + escapeHtml(post.authorInitial || '?') + '</span>',
-        '<div><strong>' + escapeHtml(post.authorName) + '</strong><p>' + escapeHtml(relativeTime(post.createdAt)) + '</p></div>',
+        '<div><strong>' + escapeHtml(post.authorName) + '</strong><p>' + escapeHtml(postmarkTime(post.createdAt)) + '</p></div>',
         '</header>',
         renderPostContent(post),
         '<footer class="post-actions">',
         post.canHeart ? '<button class="icon-action' + (post.heartedByOther ? ' hearted' : '') + '" data-action="heart-post" data-post-id="' + escapeHtml(post.id) + '" aria-label="Heart post">' + (post.heartedByOther ? '♥' : '♡') + '</button>' : '<span class="heart-state">' + (post.heartedByOther ? '♥ hearted' : '') + '</span>',
-        post.canDelete ? '<button class="text-action" data-action="delete-post" data-post-id="' + escapeHtml(post.id) + '">delete</button>' : '',
+        post.canDelete ? '<button class="text-action" data-action="delete-post" data-post-id="' + escapeHtml(post.id) + '">delete</button>' : '<span></span>',
         '</footer>',
         '</article>'
       ].join('');
@@ -604,6 +631,7 @@
         '<div class="sheet-backdrop" data-action="close-composer"></div>',
         '<section class="bottom-sheet" role="dialog" aria-modal="true">',
         '<div class="sheet-handle"></div>',
+        '<div class="eyebrow" style="margin:0 0 4px;"><span>— write</span><span>' + escapeHtml(titleCase(mode)) + '</span></div>',
         '<div class="composer-tabs">',
         ['text', 'photo', 'voice', 'song'].map(function(tab) {
           return '<button class="composer-tab' + (mode === tab ? ' active' : '') + '" data-composer-mode="' + tab + '">' + titleCase(tab) + '</button>';
@@ -615,12 +643,12 @@
     }
 
     function renderComposerBody(mode) {
-      const postButton = '<button class="primary wide" data-action="publish-post">Post</button>';
+      const postButton = '<button class="primary wide" data-action="publish-post">Send</button>';
       if (mode === 'photo') {
         return [
-          '<textarea id="composer-text" rows="3" placeholder="Add a caption..."></textarea>',
+          '<textarea id="composer-text" rows="3" placeholder="a small note for the photo..."></textarea>',
           '<input id="photo-input" type="file" accept="image/*" capture="environment">',
-          state.composer.photoPreview ? '<img class="photo-preview" src="' + escapeHtml(state.composer.photoPreview) + '" alt="Photo preview">' : '<p class="hint">Photos are resized before upload.</p>',
+          state.composer.photoPreview ? '<img class="photo-preview" src="' + escapeHtml(state.composer.photoPreview) + '" alt="Photo preview">' : '<p class="hint">— photos are gently resized before sending.</p>',
           postButton
         ].join('');
       }
@@ -628,8 +656,8 @@
       if (mode === 'song') {
         const preview = state.composer.songUrl ? detectSongClient(state.composer.songUrl) : null;
         return [
-          '<textarea id="composer-text" rows="3" placeholder="Why this song?"></textarea>',
-          '<input id="song-url" class="text-input" type="url" placeholder="Paste Spotify, YouTube, or Apple Music URL" value="' + escapeHtml(state.composer.songUrl) + '">',
+          '<textarea id="composer-text" rows="3" placeholder="why this song?"></textarea>',
+          '<input id="song-url" class="text-input" type="url" placeholder="Spotify, YouTube, or Apple Music URL" value="' + escapeHtml(state.composer.songUrl) + '">',
           preview ? renderSongEmbed(state.composer.songUrl, preview.embedUrl, preview.platform) : '',
           postButton
         ].join('');
@@ -637,10 +665,10 @@
 
       if (mode === 'voice') {
         return [
-          '<textarea id="composer-text" rows="3" placeholder="Add a note..."></textarea>',
-          state.composer.voicePreview ? '<audio class="voice-preview" controls src="' + escapeHtml(state.composer.voicePreview) + '"></audio>' : '<p class="hint">Record a short voice note.</p>',
+          '<textarea id="composer-text" rows="3" placeholder="a line for the voice note..."></textarea>',
+          state.composer.voicePreview ? '<audio class="voice-preview" controls src="' + escapeHtml(state.composer.voicePreview) + '"></audio>' : '<p class="hint">— record a short voice note.</p>',
           '<div class="button-row">',
-          '<button class="secondary" data-action="start-voice-recording" ' + (state.composer.recording ? 'disabled' : '') + '>Record</button>',
+          '<button class="secondary" data-action="start-voice-recording" ' + (state.composer.recording ? 'disabled' : '') + '>● Record</button>',
           '<button class="secondary" data-action="stop-voice-recording" ' + (!state.composer.recording ? 'disabled' : '') + '>Stop</button>',
           '</div>',
           postButton
@@ -648,7 +676,7 @@
       }
 
       return [
-        '<textarea id="composer-text" rows="7" placeholder="Share a thought..."></textarea>',
+        '<textarea id="composer-text" rows="7" placeholder="share a thought, write it like a letter..."></textarea>',
         postButton
       ].join('');
     }
@@ -658,7 +686,7 @@
       return [
         '<section class="us-shell">',
         '<div class="subtabs">',
-        '<button class="subtab' + (active === 'bucket' ? ' active' : '') + '" data-us-tab="bucket">Bucket List</button>',
+        '<button class="subtab' + (active === 'bucket' ? ' active' : '') + '" data-us-tab="bucket">Bucket list</button>',
         '<button class="subtab' + (active === 'reunions' ? ' active' : '') + '" data-us-tab="reunions">Reunions</button>',
         '</div>',
         active === 'bucket' ? renderBucket() : renderReunions(),
@@ -668,7 +696,7 @@
 
     function renderBucket() {
       if (state.us.bucket.loading && !state.us.bucket.loaded) {
-        return '<div class="card skeleton-card"></div>';
+        return '<div class="skeleton-card"></div>';
       }
 
       return [
@@ -680,9 +708,9 @@
 
     function renderBucketForm() {
       return [
-        '<section class="card compact-form">',
-        '<h2>Add something</h2>',
-        '<input id="bucket-text" class="text-input" type="text" placeholder="A place, food, or experience">',
+        '<section class="block compact-form">',
+        '<div class="eyebrow"><span>— add an idea</span></div>',
+        '<input id="bucket-text" class="text-input" type="text" placeholder="a place, food, or experience">',
         '<select id="bucket-category" class="text-input">',
         ['place', 'food', 'experience', 'other'].map(function(category) {
           return '<option value="' + category + '">' + titleCase(category) + '</option>';
@@ -700,13 +728,13 @@
       });
 
       if (!categories.length) {
-        return '<section class="card placeholder"><h2>Open ideas</h2><p>What do you want to do together?</p></section>';
+        return '<section class="placeholder" style="padding:36px 22px;text-align:left;"><h2 style="font-size:28px;">Open ideas</h2><p>what do you want to do <em style="font-style:italic;color:var(--mark);">together</em>?</p></section>';
       }
 
       return categories.map(function(category) {
         return [
           '<section class="bucket-group">',
-          '<h3>' + titleCase(category) + '</h3>',
+          '<h3>— ' + titleCase(category) + '</h3>',
           groups[category].map(renderBucketItem).join(''),
           '</section>'
         ].join('');
@@ -719,7 +747,7 @@
         '<button class="check-action" data-action="toggle-bucket" data-item-id="' + escapeHtml(item.id) + '" aria-label="Mark done"></button>',
         '<div>',
         '<strong>' + escapeHtml(item.text) + '</strong>',
-        '<p>' + escapeHtml(item.addedByName || '') + '</p>',
+        '<p>added by ' + escapeHtml(item.addedByName || '—') + '</p>',
         '</div>',
         '<button class="text-action" data-action="delete-bucket" data-item-id="' + escapeHtml(item.id) + '">delete</button>',
         '</article>'
@@ -733,24 +761,24 @@
       return [
         '<section class="done-section">',
         '<button class="link-row" data-action="toggle-done-list">Done together (' + done.length + ')</button>',
-        state.us.bucket.showDone ? done.map(function(item) {
+        state.us.bucket.showDone ? '<div>' + done.map(function(item) {
           return [
             '<article class="list-item done">',
             '<span class="check-action checked"></span>',
             '<div><strong>' + escapeHtml(item.text) + '</strong>',
-            item.doneNote ? '<p>' + escapeHtml(item.doneNote) + '</p>' : '<p>Done</p>',
+            item.doneNote ? '<p style="font-family:var(--font-serif);font-style:italic;font-size:14px;letter-spacing:0;text-transform:none;color:var(--ink-soft);margin-top:4px;">' + escapeHtml(item.doneNote) + '</p>' : '<p>done</p>',
             '</div>',
             '<button class="text-action" data-action="toggle-bucket" data-item-id="' + escapeHtml(item.id) + '">undo</button>',
             '</article>'
           ].join('');
-        }).join('') : '',
+        }).join('') + '</div>' : '',
         '</section>'
       ].join('');
     }
 
     function renderReunions() {
       if (state.us.reunions.loading && !state.us.reunions.loaded) {
-        return '<div class="card skeleton-card"></div>';
+        return '<div class="skeleton-card"></div>';
       }
 
       return [
@@ -764,13 +792,26 @@
     function renderNextReunionCard() {
       const next = state.us.reunions.next;
       if (!next) {
-        return '<section class="today-hero small"><span class="hero-number">-</span><span class="hero-label">No trips planned. Yet.</span></section>';
+        return [
+          '<section class="postmark-band small empty">',
+          '<div class="band-eyebrow">next reunion</div>',
+          '<div class="band-hero">',
+          '<span class="hero-number">soon.</span>',
+          '<div class="hero-label">no trips planned <strong>yet</strong>.</div>',
+          '</div>',
+          '</section>'
+        ].join('');
       }
 
+      const arrival = next.startDate ? 'arr. ' + escapeHtml(formatHumanDate(next.startDate)) : '';
       return [
-        '<section class="today-hero small">',
+        '<section class="postmark-band small">',
+        arrival ? '<div class="band-stamp">' + arrival + '</div>' : '',
+        '<div class="band-eyebrow">next reunion</div>',
+        '<div class="band-hero">',
         '<span class="hero-number">' + escapeHtml(next.daysUntil) + '</span>',
-        '<span class="hero-label">days until ' + escapeHtml(next.location || next.title) + '</span>',
+        '<div class="hero-label">days until <strong>' + escapeHtml(next.location || next.title) + '</strong></div>',
+        '</div>',
         '</section>'
       ].join('');
     }
@@ -778,13 +819,15 @@
     function renderReunionForm() {
       const editing = state.us.editingReunionId ? findByIdClient(state.us.reunions.upcoming.concat(state.us.reunions.past), state.us.editingReunionId) : null;
       return [
-        '<section class="card compact-form">',
-        '<h2>' + (editing ? 'Edit reunion' : 'Add reunion') + '</h2>',
-        '<input id="reunion-title" class="text-input" type="text" placeholder="Title" value="' + escapeHtml(editing ? editing.title : '') + '">',
+        '<section class="block compact-form">',
+        '<div class="eyebrow"><span>— ' + (editing ? 'edit reunion' : 'add reunion') + '</span></div>',
+        '<input id="reunion-title" class="text-input" type="text" placeholder="title" value="' + escapeHtml(editing ? editing.title : '') + '">',
+        '<div class="button-row">',
         '<input id="reunion-start" class="text-input" type="date" value="' + escapeHtml(editing ? editing.startDate : '') + '">',
         '<input id="reunion-end" class="text-input" type="date" value="' + escapeHtml(editing ? editing.endDate : '') + '">',
-        '<input id="reunion-location" class="text-input" type="text" placeholder="Location" value="' + escapeHtml(editing ? editing.location : '') + '">',
-        '<textarea id="reunion-notes" rows="3" placeholder="Notes...">' + escapeHtml(editing ? editing.notes : '') + '</textarea>',
+        '</div>',
+        '<input id="reunion-location" class="text-input" type="text" placeholder="location" value="' + escapeHtml(editing ? editing.location : '') + '">',
+        '<textarea id="reunion-notes" rows="3" placeholder="notes...">' + escapeHtml(editing ? editing.notes : '') + '</textarea>',
         '<div class="button-row">',
         '<button class="primary wide" data-action="' + (editing ? 'update-reunion' : 'add-reunion') + '">' + (editing ? 'Save' : 'Add') + '</button>',
         editing ? '<button class="secondary" data-action="cancel-reunion-edit">Cancel</button>' : '',
@@ -797,7 +840,7 @@
       if (!items.length) return '';
       return [
         '<section class="reunion-list">',
-        '<h3>' + escapeHtml(title) + '</h3>',
+        title ? '<h3>— ' + escapeHtml(title) + '</h3>' : '',
         items.map(function(item) {
           return renderReunionItem(item, past);
         }).join(''),
@@ -834,16 +877,16 @@
 
     function renderMemories() {
       if (state.memories.loading && !state.memories.loaded) {
-        return '<section class="memory-wrap"><div class="card skeleton-card"></div></section>';
+        return '<section class="memory-wrap"><div class="skeleton-card" style="margin:0;"></div></section>';
       }
 
       if (!state.memories.memory) {
         return [
-          '<section class="memory-wrap">',
-          '<article class="card memory-card">',
-          '<p class="eyebrow">Memories</p>',
-          '<h2>No old memories yet</h2>',
-          '<p>' + escapeHtml(state.memories.message || 'Once you have posts or answered questions older than 30 days, they will show up here.') + '</p>',
+          '<section class="memory-wrap" style="text-align:left;">',
+          '<article class="memory-card">',
+          '<div class="eyebrow"><span>— memories</span></div>',
+          '<h2>nothing old enough yet.</h2>',
+          '<p class="hint">' + escapeHtml(state.memories.message || 'once you have posts or answered questions older than 30 days, they will show up here.') + '</p>',
           '<button class="primary wide" data-action="show-memory">Check again</button>',
           '</article>',
           renderCapsules(),
@@ -852,9 +895,9 @@
       }
 
       return [
-        '<section class="memory-wrap">',
+        '<section class="memory-wrap" style="text-align:left;">',
         renderMemoryCard(state.memories.memory),
-        '<button class="primary wide" data-action="show-memory">Show me another</button>',
+        '<div style="padding:0 22px;"><button class="primary wide" data-action="show-memory">Show me another</button></div>',
         renderCapsules(),
         '</section>'
       ].join('');
@@ -863,17 +906,17 @@
     function renderMemoryCard(memory) {
       if (memory.type === 'question') {
         return [
-          '<article class="card memory-card">',
-          '<p class="eyebrow">' + escapeHtml(memory.date) + '</p>',
-          '<h2>' + escapeHtml(memory.question.text) + '</h2>',
+          '<article class="memory-card">',
+          '<div class="eyebrow"><span>' + escapeHtml(memory.date) + '</span><span>a question</span></div>',
+          '<h2>' + formatQuestionText(memory.question.text) + '</h2>',
           renderAnswers(memory.answers || []),
           '</article>'
         ].join('');
       }
 
       return [
-        '<article class="card memory-card">',
-        '<p class="eyebrow">' + escapeHtml(memory.date) + '</p>',
+        '<article class="memory-card">',
+        '<div class="eyebrow"><span>' + escapeHtml(memory.date) + '</span><span>a post</span></div>',
         '<div class="memory-post">',
         renderFeedPost(memory.post),
         '</div>',
@@ -886,13 +929,13 @@
       const unlocked = capsules.unlocked || [];
       const locked = capsules.locked || [];
       return [
-        '<section class="card capsule-card">',
-        '<h2>Time capsules</h2>',
-        '<textarea id="capsule-text" rows="4" placeholder="Write a letter for later..."></textarea>',
+        '<section class="capsule-card">',
+        '<div class="eyebrow"><span>— time capsules</span>' + (locked.length ? '<span>' + locked.length + ' sealed</span>' : '<span>·</span>') + '</div>',
+        '<h2>write a letter for later.</h2>',
+        '<textarea id="capsule-text" rows="4" placeholder="a letter to open another day..."></textarea>',
         '<input id="capsule-unlock" class="text-input" type="date">',
         '<button class="primary wide" data-action="create-capsule">Seal letter</button>',
-        unlocked.length ? '<div class="capsule-list">' + unlocked.map(renderCapsule).join('') + '</div>' : '<p class="hint">Unlocked letters will appear here.</p>',
-        locked.length ? '<p class="hint">' + locked.length + ' sealed for later.</p>' : '',
+        unlocked.length ? '<div class="capsule-list">' + unlocked.map(renderCapsule).join('') + '</div>' : '<p class="hint">— unlocked letters will appear here.</p>',
         '</section>'
       ].join('');
     }
@@ -900,21 +943,22 @@
     function renderCapsule(capsule) {
       return [
         '<article class="capsule-item">',
-        '<p class="eyebrow">' + escapeHtml(capsule.unlockDate) + ' · ' + escapeHtml(capsule.authorName) + '</p>',
+        '<div class="eyebrow"><span>' + escapeHtml(capsule.unlockDate) + '</span><span>from ' + escapeHtml(capsule.authorName) + '</span></div>',
         '<p>' + escapeHtml(capsule.text) + '</p>',
-        capsule.opened ? '<span class="hint">Opened</span>' : '<button class="text-action" data-action="open-capsule" data-capsule-id="' + escapeHtml(capsule.id) + '">mark opened</button>',
+        capsule.opened ? '<span class="hint" style="font-size:13px;">— opened</span>' : '<button class="text-action" data-action="open-capsule" data-capsule-id="' + escapeHtml(capsule.id) + '" style="margin-top:8px;">mark opened</button>',
         '</article>'
       ].join('');
     }
 
     function renderPlaceholderTab() {
-      return '<section class="card placeholder"><h2>' + titleCase(state.activeTab) + '</h2><p>Coming in a later phase.</p></section>';
+      return '<section class="placeholder"><h2>' + titleCase(state.activeTab) + '</h2><p>coming soon.</p></section>';
     }
 
     function renderTabs() {
+      const labels = { today: 'Today', feed: 'Feed', us: 'Us', memories: 'Memo.' };
       return '<nav class="tabbar">' + ['today', 'feed', 'us', 'memories'].map(function(tab) {
         const active = state.activeTab === tab ? ' active' : '';
-        return '<button class="tab' + active + '" data-tab="' + tab + '">' + titleCase(tab) + '</button>';
+        return '<button class="tab' + active + '" data-tab="' + tab + '">' + labels[tab] + '</button>';
       }).join('') + '</nav>';
     }
 
@@ -1803,6 +1847,44 @@
       if (hours < 24) return hours + 'h ago';
       const days = Math.floor(hours / 24);
       return days + 'd ago';
+    }
+
+    // ---- Postmark display helpers ----------------------------------------
+
+    function postmarkTime(value) {
+      const date = new Date(value);
+      if (!Number.isFinite(date.getTime())) return relativeTime(value);
+      const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+      const dd = String(date.getDate()).padStart(2, '0');
+      const mm = months[date.getMonth()];
+      const hh = String(date.getHours()).padStart(2, '0');
+      const mi = String(date.getMinutes()).padStart(2, '0');
+      return dd + ' ' + mm + ' · ' + hh + ':' + mi;
+    }
+
+    function formatHumanDate(value) {
+      const text = String(value || '').trim();
+      if (!text) return '';
+      const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      let date;
+      if (isoMatch) {
+        date = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+      } else {
+        date = new Date(text);
+      }
+      if (!Number.isFinite(date.getTime())) return text;
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return date.getDate() + ' ' + months[date.getMonth()] + ' ' + date.getFullYear();
+    }
+
+    // Wraps the last meaningful word/phrase of a question in <em> for emphasis.
+    function formatQuestionText(text) {
+      const safe = escapeHtml(text || '');
+      if (!safe) return '';
+      // Find the last word before the final ? or end of string and italicize it.
+      const match = safe.match(/^(.*?)(\s)([A-Za-z\u2019']+)([?.!]?)\s*$/);
+      if (!match) return safe;
+      return match[1] + match[2] + '<em>' + match[3] + '</em>' + match[4];
     }
 
     function gasRun(functionName) {
