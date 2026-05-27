@@ -12,7 +12,7 @@ window.__BOOTSTRAP__ = {
     relationship_start_date: '2023-01-17',
     intimate_enabled: 'TRUE',
     web_app_url: 'https://script.google.com/macros/s/AKfycbwY1IowMXAVhc59RsSQNppSSwW_6tTkmHtxt9JLTtfmuu3J3MtWb53CAxMjNHigFgQM/exec',
-    github_pages_url: '',
+    github_pages_url: 'https://mainakaunt.github.io/rm-us/',
     onesignal_app_id: '64fd5b74-761c-4f6c-be01-d3b6df791a56',
     onesignal_safari_web_id: 'web.onesignal.auto.378d36e2-d61e-4d1d-83ad-a561308305e8',
     service_worker_path: 'sw.js',
