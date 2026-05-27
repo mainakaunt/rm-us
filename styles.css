@@ -345,21 +345,24 @@ h1, h2, h3, h4, p { margin: 0; }
 }
 .stats-strip .thinking {
   grid-column: 1 / -1;
-  padding: 0;
+  padding: 14px 16px 16px;
+  border-top: 1px dashed var(--rule-dash);
 }
 .stats-strip .thinking .hint {
-  padding: 0 18px 14px;
-  margin: -4px 0 0;
+  padding: 0;
+  margin: 10px 2px 0;
   font-size: 14px;
   text-transform: none;
   letter-spacing: 0;
 }
 .stats-strip .thinking button {
   width: 100%;
+  min-height: 52px;
   padding: 14px 18px;
-  border-top: 1px dashed var(--rule-dash);
-  background: transparent;
-  color: var(--mark);
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--mark), #f19a72);
+  color: #fffaf4;
+  box-shadow: 0 14px 28px rgba(177, 66, 40, 0.18);
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.18em;
@@ -371,10 +374,10 @@ h1, h2, h3, h4, p { margin: 0; }
   align-items: center;
 }
 .stats-strip .thinking button::after {
-  content: "↗";
+  content: "send";
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: 18px;
+  font-size: 16px;
   letter-spacing: 0;
   text-transform: none;
 }

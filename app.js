@@ -53,6 +53,7 @@
     };
 
     let serviceWorkerReadyPromise = Promise.resolve(null);
+    let pendingRouteFocus = '';
 
     function init() {
       document.documentElement.style.setProperty('--accent', config.accent_color || '#E07856');
@@ -74,10 +75,17 @@
       setupInlinePrompts();
       setupGlobalTapFallbacks();
       setupOneSignal();
+      applyRouteFromUrl();
       render();
       loadToday();
+      loadActiveTabData();
       window.addEventListener('scroll', maybeLoadMoreFeed, { passive: true });
       window.addEventListener('resize', setupMobileViewport, { passive: true });
+      window.addEventListener('popstate', function() {
+        applyRouteFromUrl();
+        render();
+        loadActiveTabData();
+      });
     }
 
     function initExternalFrontend() {
@@ -331,6 +339,7 @@
         state.error ? '<div class="toast">' + escapeHtml(state.error) + '</div>' : ''
       ].join('');
       bindEvents();
+      scrollToPendingFocus();
     }
 
     function renderActiveTab() {
@@ -466,7 +475,7 @@
         : '';
 
       return [
-        '<section class="block question-card">',
+        '<section class="block question-card" data-focus="question">',
         '<div class="eyebrow">',
         "<span>Today\u2019s question · " + escapeHtml(question.category || 'daily') + '</span>',
         '<span>·</span>',
@@ -492,7 +501,7 @@
         ? '<p class="hint">— ' + escapeHtml(thinking.latestReceived.name) + ' thought of you ' + escapeHtml(relativeTime(thinking.latestReceived.createdAt)) + '</p>'
         : (thinking.latestSent ? '<p class="hint">— you sent one ' + escapeHtml(relativeTime(thinking.latestSent.createdAt)) + '</p>' : '');
       return [
-        '<section class="stats-strip">',
+        '<section class="stats-strip" data-focus="thinking stats">',
         '<div class="stat"><strong>' + escapeHtml(stats.daysTogether == null ? '—' : stats.daysTogether) + '</strong><span>days together</span></div>',
         '<div class="stat"><strong>' + escapeHtml(today.answerStreak || 0) + '</strong><span>answer streak</span></div>',
         milestone,
@@ -506,7 +515,7 @@
       const photos = dailyPhoto.photos || [];
       const reveal = photos.length >= 2;
       return [
-        '<section class="block daily-photo-card">',
+        '<section class="block daily-photo-card" data-focus="daily-photo">',
         '<div class="eyebrow"><span>Daily photo</span><span>' + escapeHtml(dailyPhoto.date || '') + '</span></div>',
         reveal ? '<div class="daily-photo-grid">' + photos.map(function(photo) {
           return [
@@ -540,7 +549,7 @@
     function renderStatusButtons(today) {
       const latest = latestStatusText(today.status || []);
       return [
-        '<section class="block status-panel">',
+        '<section class="block status-panel" data-focus="status">',
         '<div class="eyebrow"><span>Status</span><span>·</span></div>',
         '<div class="button-row">',
         '<button class="secondary" data-action="status" data-type="morning">good morning ☀</button>',
@@ -933,7 +942,7 @@
       const unlocked = capsules.unlocked || [];
       const locked = capsules.locked || [];
       return [
-        '<section class="capsule-card">',
+        '<section class="capsule-card" data-focus="capsules">',
         '<div class="eyebrow"><span>— time capsules</span>' + (locked.length ? '<span>' + locked.length + ' sealed</span>' : '<span>·</span>') + '</div>',
         '<h2>write a letter for later.</h2>',
         '<textarea id="capsule-text" rows="4" placeholder="a letter to open another day..."></textarea>',
@@ -969,10 +978,7 @@
     function bindEvents() {
       root.querySelectorAll('[data-tab]').forEach(function(button) {
         button.addEventListener('click', function() {
-          state.activeTab = button.getAttribute('data-tab');
-          if (state.activeTab === 'feed' && !state.feed.loaded) loadFeed(true);
-          if (state.activeTab === 'us' && (!state.us.bucket.loaded || !state.us.reunions.loaded)) loadUs();
-          if (state.activeTab === 'memories' && !state.memories.loaded) loadMemory();
+          activateTab(button.getAttribute('data-tab'), true);
           render();
         });
       });
@@ -1626,19 +1632,28 @@
 
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(function(stream) {
-          const recorder = new MediaRecorder(stream);
+          const preferredMime = preferredAudioMimeType();
+          const recorder = preferredMime ? new MediaRecorder(stream, { mimeType: preferredMime }) : new MediaRecorder(stream);
           state.composer.voiceChunks = [];
           state.composer.recorder = recorder;
           recorder.ondataavailable = function(event) {
             if (event.data && event.data.size) state.composer.voiceChunks.push(event.data);
           };
           recorder.onstop = function() {
-            const mimeType = recorder.mimeType || 'audio/webm';
+            const firstChunk = state.composer.voiceChunks[0];
+            const mimeType = recorder.mimeType || (firstChunk && firstChunk.type) || preferredMime || 'audio/mp4';
             const blob = new Blob(state.composer.voiceChunks, { type: mimeType });
             stream.getTracks().forEach(function(track) { track.stop(); });
+            if (!blob.size) {
+              showToast('No voice audio was recorded.');
+              state.composer.recording = false;
+              state.composer.recorder = null;
+              render();
+              return;
+            }
             blobToBase64(blob).then(function(base64) {
               state.composer.voiceBase64 = base64;
-              state.composer.voiceMimeType = mimeType;
+              state.composer.voiceMimeType = baseMimeType(mimeType);
               state.composer.voicePreview = URL.createObjectURL(blob);
               state.composer.recording = false;
               state.composer.recorder = null;
@@ -1652,6 +1667,23 @@
         .catch(function() {
           showToast('Microphone access was not allowed.');
         });
+    }
+
+    function preferredAudioMimeType() {
+      if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+      const candidates = [
+        'audio/mp4;codecs=mp4a.40.2',
+        'audio/mp4',
+        'audio/webm;codecs=opus',
+        'audio/webm'
+      ];
+      return candidates.find(function(mimeType) {
+        return MediaRecorder.isTypeSupported(mimeType);
+      }) || '';
+    }
+
+    function baseMimeType(mimeType) {
+      return String(mimeType || '').split(';')[0].trim().toLowerCase();
     }
 
     function stopVoiceRecording() {
@@ -1771,6 +1803,59 @@
 
     function getExternalToken() {
       return externalFrontend ? String(localStorage.getItem('us_frontend_token') || '').trim() : '';
+    }
+
+    function applyRouteFromUrl() {
+      const tab = getRouteTab();
+      if (tab) state.activeTab = tab;
+      const focus = getRouteFocus();
+      pendingRouteFocus = focus;
+      if (focus === 'reunions') state.us.subtab = 'reunions';
+      if (focus === 'bucket') state.us.subtab = 'bucket';
+    }
+
+    function getRouteTab() {
+      const params = new URLSearchParams(window.location.search || '');
+      const tab = params.get('tab') || String(window.location.hash || '').replace(/^#/, '');
+      return ['today', 'feed', 'us', 'memories'].indexOf(tab) !== -1 ? tab : '';
+    }
+
+    function getRouteFocus() {
+      const params = new URLSearchParams(window.location.search || '');
+      return params.get('focus') || '';
+    }
+
+    function scrollToPendingFocus() {
+      if (!pendingRouteFocus) return;
+      window.setTimeout(function() {
+        const target = document.querySelector('[data-focus~="' + cssEscape(pendingRouteFocus) + '"]');
+        if (!target) return;
+        pendingRouteFocus = '';
+        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }, 120);
+    }
+
+    function cssEscape(value) {
+      if (window.CSS && CSS.escape) return CSS.escape(value);
+      return String(value || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    }
+
+    function activateTab(tab, updateUrl) {
+      if (['today', 'feed', 'us', 'memories'].indexOf(tab) === -1) return;
+      state.activeTab = tab;
+      if (updateUrl && window.history && window.history.pushState) {
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.set('tab', tab);
+        nextUrl.searchParams.delete('focus');
+        window.history.pushState({}, '', nextUrl.toString());
+      }
+      loadActiveTabData();
+    }
+
+    function loadActiveTabData() {
+      if (state.activeTab === 'feed' && !state.feed.loaded) loadFeed(true);
+      if (state.activeTab === 'us' && (!state.us.bucket.loaded || !state.us.reunions.loaded)) loadUs();
+      if (state.activeTab === 'memories' && !state.memories.loaded) loadMemory();
     }
 
     function createUploadId() {
