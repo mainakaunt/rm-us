@@ -347,6 +347,13 @@ h1, h2, h3, h4, p { margin: 0; }
   grid-column: 1 / -1;
   padding: 0;
 }
+.stats-strip .thinking .hint {
+  padding: 0 18px 14px;
+  margin: -4px 0 0;
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: 0;
+}
 .stats-strip .thinking button {
   width: 100%;
   padding: 14px 18px;

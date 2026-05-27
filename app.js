@@ -487,12 +487,16 @@
       const milestone = stats.nextMilestone
         ? '<div class="milestone">— ' + escapeHtml(stats.nextMilestone.label) + ' in <strong style="font-style:normal;color:var(--mark);">' + escapeHtml(stats.nextMilestone.daysUntil) + '</strong> days</div>'
         : '';
+      const thinking = today.thinking || {};
+      const thinkingNote = thinking.latestReceived
+        ? '<p class="hint">— ' + escapeHtml(thinking.latestReceived.name) + ' thought of you ' + escapeHtml(relativeTime(thinking.latestReceived.createdAt)) + '</p>'
+        : (thinking.latestSent ? '<p class="hint">— you sent one ' + escapeHtml(relativeTime(thinking.latestSent.createdAt)) + '</p>' : '');
       return [
         '<section class="stats-strip">',
         '<div class="stat"><strong>' + escapeHtml(stats.daysTogether == null ? '—' : stats.daysTogether) + '</strong><span>days together</span></div>',
         '<div class="stat"><strong>' + escapeHtml(today.answerStreak || 0) + '</strong><span>answer streak</span></div>',
         milestone,
-        '<div class="thinking"><button data-action="thinking-of-you">Thinking of you</button></div>',
+        '<div class="thinking"><button data-action="thinking-of-you">Thinking of you</button>' + thinkingNote + '</div>',
         '</section>'
       ].join('');
     }
@@ -1095,6 +1099,7 @@
             .then(function(result) {
               if (!result.ok) throw new Error(result.error || 'Nudge failed');
               showToast('Sent.');
+              return loadToday();
             })
             .catch(function(err) {
               showToast(humanError(err.message));
@@ -1308,6 +1313,10 @@
       if (mode === 'text' && !payload.text) return showToast('Write something first.');
 
       publish.disabled = true;
+      if (externalFrontend && (mode === 'photo' || mode === 'voice')) {
+        publishMediaPost(payload, publish);
+        return;
+      }
       apiPost('createPost', payload)
         .then(function(result) {
           if (!result.ok) throw new Error(result.error || 'Post failed');
@@ -1558,6 +1567,20 @@
       if (!file) return showToast('Choose a photo first.');
       resizePhoto(file)
         .then(function(photo) {
+          if (externalFrontend) {
+            const uploadId = createUploadId();
+            showToast('Sending photo...');
+            return externalUploadPost('submitDailyPhoto', {
+              uploadId: uploadId,
+              mediaBase64: photo.base64,
+              mediaMimeType: photo.mimeType
+            }).then(function() {
+              return pollTodayForDailyPhoto(uploadId);
+            }).then(function(today) {
+              state.today = today;
+              return { ok: true, data: { dailyPhoto: today.dailyPhoto } };
+            });
+          }
           return apiPost('submitDailyPhoto', {
             mediaBase64: photo.base64,
             mediaMimeType: photo.mimeType
@@ -1570,6 +1593,28 @@
         })
         .catch(function(err) {
           showToast(humanError(err.message));
+        });
+    }
+
+    function publishMediaPost(payload, publishButton) {
+      const uploadId = createUploadId();
+      const body = Object.assign({}, payload, { uploadId: uploadId });
+      showToast(payload.type === 'voice' ? 'Sending voice note...' : 'Sending photo...');
+      externalUploadPost('createPost', body)
+        .then(function() {
+          return pollFeedForUpload(uploadId);
+        })
+        .then(function(post) {
+          state.feed.items = state.feed.items.filter(function(item) {
+            return item.id !== post.id;
+          });
+          state.feed.items.unshift(post);
+          state.feed.loaded = true;
+          closeComposer();
+        })
+        .catch(function(err) {
+          showToast(humanError(err.message));
+          if (publishButton) publishButton.disabled = false;
         });
     }
 
@@ -1726,6 +1771,78 @@
 
     function getExternalToken() {
       return externalFrontend ? String(localStorage.getItem('us_frontend_token') || '').trim() : '';
+    }
+
+    function createUploadId() {
+      if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+      return 'upload-' + Date.now() + '-' + Math.floor(Math.random() * 1000000);
+    }
+
+    function externalUploadPost(action, payload) {
+      if (!config.web_app_url) return Promise.reject(new Error('missing_backend_url'));
+      const token = getExternalToken();
+      if (!token) return Promise.reject(new Error('unauthorized'));
+      const body = Object.assign({}, payload || {}, {
+        action: action,
+        token: token
+      });
+      return fetch(config.web_app_url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(body),
+        keepalive: false
+      }).then(function() {
+        return { ok: true };
+      });
+    }
+
+    function pollTodayForDailyPhoto(uploadId) {
+      return pollUntil(function() {
+        return apiGet('getToday').then(function(result) {
+          if (!result.ok) throw new Error(result.error || 'Today failed');
+          const today = result.data || {};
+          const dailyPhoto = today.dailyPhoto || {};
+          if (dailyPhoto.myUploadId === uploadId) return today;
+          return null;
+        });
+      }, 26000, 1800);
+    }
+
+    function pollFeedForUpload(uploadId) {
+      return pollUntil(function() {
+        return apiGet('getFeed', { before: '', limit: 20 }).then(function(result) {
+          if (!result.ok) throw new Error(result.error || 'Feed failed');
+          const data = result.data || {};
+          const items = data.items || [];
+          return items.find(function(item) {
+            return item.uploadId === uploadId;
+          }) || null;
+        });
+      }, 30000, 1800);
+    }
+
+    function pollUntil(check, timeoutMs, intervalMs) {
+      const started = Date.now();
+      return new Promise(function(resolve, reject) {
+        function tick() {
+          Promise.resolve()
+            .then(check)
+            .then(function(value) {
+              if (value) {
+                resolve(value);
+                return;
+              }
+              if (Date.now() - started >= timeoutMs) {
+                reject(new Error('upload_timeout'));
+                return;
+              }
+              window.setTimeout(tick, intervalMs);
+            })
+            .catch(reject);
+        }
+        tick();
+      });
     }
 
     function replaceFeedPost(post) {
@@ -1995,6 +2112,8 @@
       const map = {
         answer_required: 'Write an answer first.',
         question_locked_until_tonight: "Today's question unlocks tonight.",
+        question_log_missing: "Today's question needed a repair. Reload and try again.",
+        stale_question_log: "Today's question changed. Reload and try again.",
         invalid_status_type: 'That status is not available.',
         questions_not_seeded: 'Questions have not been seeded yet. Run setup again.',
         invalid_post_type: 'Choose a valid post type.',
@@ -2021,6 +2140,7 @@
         service_worker_missing: 'This browser does not expose service workers for this app.',
         missing_backend_url: 'Backend URL is missing in app-config.js.',
         payload_too_large_for_static_frontend: 'That upload is too large for the static frontend bridge.',
+        upload_timeout: 'The upload is still processing. Refresh in a moment before trying again.',
         backend_timeout: 'The backend did not respond in time.',
         backend_unreachable: 'The backend could not be reached.',
         nudge_rate_limited: 'Give it a few minutes before sending another one.',
