@@ -1352,9 +1352,7 @@
           serviceWorkerReadyPromise = waitForServiceWorkerReady(OneSignal, 'after_onesignal_init');
           attachPushSubscriptionListener(OneSignal);
           identifyOneSignalUser(OneSignal);
-          return waitForPushSubscriptionId(OneSignal, 2500);
-        }).then(function(playerId) {
-          return registerCurrentPushDevice(OneSignal, playerId);
+          return serviceWorkerReadyPromise.catch(function() { return null; });
         }).catch(function(err) {
           logPushDiagnostic(OneSignal, err && err.message ? 'onesignal_init_or_ready_failed:' + err.message : 'onesignal_init_or_ready_failed');
           return null;

@@ -15,7 +15,7 @@ window.__BOOTSTRAP__ = {
     github_pages_url: 'https://mainakaunt.github.io/rm-us/',
     onesignal_app_id: '02397349-4d30-40d3-932c-f231418449d6',
     onesignal_safari_web_id: 'web.onesignal.auto.1d2463f6-17a6-4c7e-80c3-735ae8ddc977',
-    service_worker_path: 'sw.js',
-    service_worker_scope: './'
+    service_worker_path: 'rm-us/sw.js',
+    service_worker_scope: '/rm-us/'
   }
 };
