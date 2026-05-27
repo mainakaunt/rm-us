@@ -1315,12 +1315,8 @@
           showToast(humanError('push_not_supported'));
           return;
         }
-        serviceWorkerReadyPromise.catch(function() {
-          return null;
-        }).then(function() {
-          logPushDiagnostic(OneSignal, 'permission_request_start');
-          return requestNotificationPermissionWithFallback(OneSignal);
-        }).then(function(permission) {
+        logPushDiagnostic(OneSignal, 'permission_request_start');
+        requestNotificationPermissionWithFallback(OneSignal).then(function(permission) {
           if (permission === false || Notification.permission === 'denied') throw new Error('notifications_denied');
           return OneSignal.User && OneSignal.User.PushSubscription && OneSignal.User.PushSubscription.optIn
             ? OneSignal.User.PushSubscription.optIn()
@@ -1356,9 +1352,7 @@
           });
           attachPushSubscriptionListener(OneSignal);
           identifyOneSignalUser(OneSignal);
-          return registerCurrentPushDevice(OneSignal).catch(function() {
-            return null;
-          });
+          return null;
         }).catch(function(err) {
           logPushDiagnostic(OneSignal, err && err.message ? 'onesignal_init_or_ready_failed:' + err.message : 'onesignal_init_or_ready_failed');
           return null;
@@ -1373,7 +1367,7 @@
       OneSignal.User.PushSubscription.addEventListener('change', function(event) {
         const id = (event && event.current && event.current.id) || OneSignal.User.PushSubscription.id || '';
         logPushDiagnostic(OneSignal, id ? 'push_subscription_changed_with_id' : 'push_subscription_changed_no_id');
-        if (id) registerCurrentPushDevice(OneSignal, id).catch(function() {});
+        if (id && isPushPermissionGranted(OneSignal)) registerCurrentPushDevice(OneSignal, id).catch(function() {});
       });
     }
 
@@ -1453,10 +1447,21 @@
         ? OneSignal.User.PushSubscription.id
         : '');
       if (!playerId) return Promise.resolve();
+      if (!isPushPermissionGranted(OneSignal)) {
+        logPushDiagnostic(OneSignal, 'register_skipped_permission_not_granted');
+        return Promise.resolve();
+      }
       return apiPost('registerPushDevice', {
         playerId: playerId,
         deviceLabel: navigator.userAgent
       });
+    }
+
+    function isPushPermissionGranted(OneSignal) {
+      const push = OneSignal && OneSignal.User && OneSignal.User.PushSubscription ? OneSignal.User.PushSubscription : {};
+      if (typeof push.optedIn === 'boolean' && push.optedIn) return true;
+      if ('Notification' in window && Notification.permission === 'granted') return true;
+      return false;
     }
 
     function logPushDiagnostic(OneSignal, reason) {
