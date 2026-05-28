@@ -16,7 +16,11 @@
         hasMore: false,
         loading: false,
         loadingMore: false,
-        loaded: false
+        loaded: false,
+        voiceData: {},
+        voiceLoading: {},
+        voiceErrors: {},
+        voiceFrameLogged: {}
       },
       composer: {
         open: false,
@@ -136,6 +140,10 @@
     }
 
     function loadToday() {
+      const cachedToday = readCache('today');
+      if (!state.today && cachedToday) {
+        state.today = cachedToday;
+      }
       state.loading = true;
       render();
       apiGet('getToday')
@@ -145,6 +153,7 @@
             state.ui.revealAnswers = false;
           }
           state.today = result.data;
+          writeCache('today', state.today);
           state.error = '';
         })
         .catch(function(err) {
@@ -159,6 +168,13 @@
     function loadFeed(reset) {
       if (state.feed.loading || state.feed.loadingMore) return Promise.resolve();
       if (reset) {
+        const cachedFeed = readCache('feed');
+        if (!state.feed.loaded && cachedFeed && cachedFeed.items) {
+          state.feed.items = cachedFeed.items || [];
+          state.feed.nextCursor = cachedFeed.nextCursor || null;
+          state.feed.hasMore = Boolean(cachedFeed.hasMore);
+          state.feed.loaded = true;
+        }
         state.feed.loading = true;
         state.feed.nextCursor = null;
         state.feed.hasMore = false;
@@ -178,6 +194,13 @@
           state.feed.nextCursor = data.nextCursor || null;
           state.feed.hasMore = Boolean(data.hasMore);
           state.feed.loaded = true;
+          if (reset) {
+            writeCache('feed', {
+              items: state.feed.items,
+              nextCursor: state.feed.nextCursor,
+              hasMore: state.feed.hasMore
+            });
+          }
           state.error = '';
         })
         .catch(function(err) {
@@ -594,7 +617,10 @@
         '</header>',
         renderPostContent(post),
         '<footer class="post-actions">',
+        '<div class="post-action-left">',
         post.canHeart ? '<button class="icon-action' + (post.heartedByOther ? ' hearted' : '') + '" data-action="heart-post" data-post-id="' + escapeHtml(post.id) + '" aria-label="Heart post">' + (post.heartedByOther ? '♥' : '♡') + '</button>' : '<span class="heart-state">' + (post.heartedByOther ? '♥ hearted' : '') + '</span>',
+        post.type === 'voice' ? '<button class="text-action" data-action="log-voice-diagnostic" data-post-id="' + escapeHtml(post.id) + '">debug voice</button>' : '',
+        '</div>',
         post.canDelete ? '<button class="text-action" data-action="delete-post" data-post-id="' + escapeHtml(post.id) + '">delete</button>' : '<span></span>',
         '</footer>',
         '</article>'
@@ -617,9 +643,20 @@
       }
 
       if (post.type === 'voice') {
+        const voice = state.feed.voiceData[post.id];
+        const loading = state.feed.voiceLoading[post.id];
+        const error = state.feed.voiceErrors[post.id];
+        const previewUrl = post.mediaPreviewUrl || post.mediaUrl || '';
         return [
           post.text ? '<p class="post-text">' + escapeHtml(post.text) + '</p>' : '',
-          '<audio class="voice-player" controls src="' + escapeHtml(post.mediaUrl) + '"></audio>'
+          voice && voice.base64
+            ? '<audio class="voice-player" controls preload="metadata" src="' + escapeHtml(voiceAudioSource(voice)) + '" data-post-id="' + escapeHtml(post.id) + '" data-audio-source="inline"></audio>'
+            : (!error && previewUrl
+              ? '<iframe class="voice-frame" src="' + escapeHtml(previewUrl) + '" loading="lazy" allow="autoplay" data-post-id="' + escapeHtml(post.id) + '"></iframe>'
+              : '<button class="voice-load" data-action="load-voice" data-post-id="' + escapeHtml(post.id) + '" ' + (loading ? 'disabled' : '') + '>' + (loading ? 'Loading voice note...' : 'Load voice note') + '</button>'),
+          previewUrl && !voice ? '<button class="voice-load compact" data-action="load-voice" data-post-id="' + escapeHtml(post.id) + '" ' + (loading ? 'disabled' : '') + '>' + (loading ? 'Loading fallback...' : 'Try fallback player') + '</button>' : '',
+          error ? '<p class="voice-error">' + escapeHtml(error) + '</p>' : '',
+          post.mediaDownloadUrl ? '<a class="voice-open-link" href="' + escapeHtml(post.mediaDownloadUrl) + '" target="_blank" rel="noopener">Open if it will not play</a>' : ''
         ].join('');
       }
 
@@ -636,6 +673,71 @@
       }
 
       return '<iframe class="song-embed" src="' + escapeHtml(embedUrl) + '" loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>';
+    }
+
+    function voiceAudioSource(voice) {
+      const mimeTypes = Array.isArray(voice.mimeTypes) && voice.mimeTypes.length ? voice.mimeTypes : [voice.mimeType || 'audio/mp4'];
+      const index = Math.min(Math.max(Number(voice.candidateIndex || 0), 0), mimeTypes.length - 1);
+      const mimeType = mimeTypes[index] || 'audio/mp4';
+      if (voice.objectUrl && voice.objectMimeType === mimeType) return voice.objectUrl;
+      if (voice.objectUrl) URL.revokeObjectURL(voice.objectUrl);
+      voice.objectUrl = URL.createObjectURL(base64ToBlob(voice.base64, mimeType));
+      voice.objectMimeType = mimeType;
+      return voice.objectUrl;
+    }
+
+    function base64ToBlob(base64, mimeType) {
+      const clean = String(base64 || '').replace(/^data:[^,]+,/, '');
+      const binary = atob(clean);
+      const chunkSize = 32768;
+      const chunks = [];
+      for (let offset = 0; offset < binary.length; offset += chunkSize) {
+        const slice = binary.slice(offset, offset + chunkSize);
+        const bytes = new Uint8Array(slice.length);
+        for (let i = 0; i < slice.length; i += 1) {
+          bytes[i] = slice.charCodeAt(i);
+        }
+        chunks.push(bytes);
+      }
+      return new Blob(chunks, { type: mimeType || 'audio/mp4' });
+    }
+
+    function loadVoiceData(postId, reason) {
+      if (!postId || state.feed.voiceLoading[postId]) return Promise.resolve();
+      if (state.feed.voiceData[postId] && state.feed.voiceData[postId].base64) return Promise.resolve();
+
+      state.feed.voiceLoading[postId] = true;
+      state.feed.voiceErrors[postId] = reason === 'drive_audio_error' ? 'Loading voice note...' : '';
+      render();
+
+      return apiGet('getVoiceData', { postId: postId })
+        .then(function(result) {
+          if (!result.ok) throw new Error(result.error || 'Voice failed');
+          state.feed.voiceData[postId] = Object.assign({ candidateIndex: 0 }, result.data || {});
+          state.feed.voiceErrors[postId] = '';
+        })
+        .catch(function(err) {
+          state.feed.voiceErrors[postId] = humanError(err.message);
+          logClientDiagnostic('voice_load_failed', {
+            postId: postId,
+            message: String(err && err.message || err)
+          });
+        })
+        .finally(function() {
+          state.feed.voiceLoading[postId] = false;
+          render();
+        });
+    }
+
+    function logVoiceDiagnostic(postId, reason) {
+      if (!postId) return Promise.resolve();
+      logClientDiagnostic('voice_diagnostic_requested', { postId: postId, message: reason || '' });
+      return apiGet('getVoiceDiagnostics', { postId: postId }).catch(function(err) {
+        logClientDiagnostic('voice_diagnostic_failed', {
+          postId: postId,
+          message: String(err && err.message || err)
+        });
+      });
     }
 
     function renderComposer() {
@@ -1204,12 +1306,65 @@
           apiPost('heartPost', { postId: postId })
             .then(function(result) {
               if (!result.ok) throw new Error(result.error || 'Heart failed');
-              replaceFeedPost(result.data.post);
+              if (result.data && result.data.post) {
+                replaceFeedPost(result.data.post);
+              } else {
+                return loadFeed(true);
+              }
             })
             .catch(function(err) {
               showToast(humanError(err.message));
             });
         });
+      });
+
+      root.querySelectorAll('[data-action="load-voice"]').forEach(function(button) {
+        button.addEventListener('click', function() {
+          const postId = button.getAttribute('data-post-id');
+          loadVoiceData(postId);
+        });
+      });
+
+      root.querySelectorAll('[data-action="log-voice-diagnostic"]').forEach(function(button) {
+        button.addEventListener('click', function() {
+          const postId = button.getAttribute('data-post-id');
+          button.disabled = true;
+          button.textContent = 'Logged';
+          logVoiceDiagnostic(postId, 'manual_button');
+        });
+      });
+
+      root.querySelectorAll('.voice-frame').forEach(function(frame) {
+        frame.addEventListener('load', function() {
+          const postId = frame.getAttribute('data-post-id');
+          if (!postId || state.feed.voiceFrameLogged[postId]) return;
+          state.feed.voiceFrameLogged[postId] = true;
+          logClientDiagnostic('voice_drive_frame_loaded', {
+            postId: postId,
+            frameSrcPresent: Boolean(frame.getAttribute('src'))
+          });
+        }, { once: true });
+      });
+
+      root.querySelectorAll('.voice-player').forEach(function(player) {
+        player.addEventListener('error', function() {
+          const postId = player.getAttribute('data-post-id');
+          const voice = state.feed.voiceData[postId];
+          const mimeTypes = voice && Array.isArray(voice.mimeTypes) ? voice.mimeTypes : [];
+          const nextIndex = Number(voice && voice.candidateIndex || 0) + 1;
+          logClientDiagnostic('voice_inline_audio_error', {
+            postId: postId,
+            mimeType: mimeTypes[Number(voice && voice.candidateIndex || 0)] || '',
+            mediaError: player.error ? player.error.code : ''
+          });
+          if (voice && nextIndex < mimeTypes.length) {
+            voice.candidateIndex = nextIndex;
+            state.feed.voiceErrors[postId] = '';
+          } else {
+            state.feed.voiceErrors[postId] = 'Could not play here. Open voice note.';
+          }
+          render();
+        }, { once: true });
       });
 
       root.querySelectorAll('[data-action="delete-post"]').forEach(function(button) {
@@ -1805,6 +1960,29 @@
       return externalFrontend ? String(localStorage.getItem('us_frontend_token') || '').trim() : '';
     }
 
+    function readCache(key) {
+      try {
+        const raw = sessionStorage.getItem('us_cache_' + key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || Date.now() - parsed.savedAt > 10 * 60 * 1000) return null;
+        return parsed.value;
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function writeCache(key, value) {
+      try {
+        sessionStorage.setItem('us_cache_' + key, JSON.stringify({
+          savedAt: Date.now(),
+          value: value
+        }));
+      } catch (err) {
+        // Cache is best-effort only.
+      }
+    }
+
     function applyRouteFromUrl() {
       const tab = getRouteTab();
       if (tab) state.activeTab = tab;
@@ -1934,6 +2112,9 @@
       state.feed.items = state.feed.items.map(function(item) {
         return item.id === post.id ? post : item;
       });
+      if (state.memories.memory && state.memories.memory.type === 'feed' && state.memories.memory.post && state.memories.memory.post.id === post.id) {
+        state.memories.memory.post = post;
+      }
       render();
     }
 
@@ -2127,6 +2308,15 @@
     function apiPost(action, payload) {
       if (externalFrontend) return externalApi('post', action, payload || {});
       return gasRun('clientApiPost', Object.assign({ action: action }, payload || {}));
+    }
+
+    function logClientDiagnostic(reason, details) {
+      const payload = Object.assign({
+        reason: reason,
+        userAgent: navigator.userAgent,
+        standalone: String(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone || '')
+      }, details || {});
+      apiPost('logClientDiagnostic', payload).catch(function() {});
     }
 
     function externalApi(method, action, payload) {
