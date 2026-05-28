@@ -19,8 +19,7 @@
         loaded: false,
         voiceData: {},
         voiceLoading: {},
-        voiceErrors: {},
-        voiceFrameLogged: {}
+        voiceErrors: {}
       },
       composer: {
         open: false,
@@ -619,7 +618,6 @@
         '<footer class="post-actions">',
         '<div class="post-action-left">',
         post.canHeart ? '<button class="icon-action' + (post.heartedByOther ? ' hearted' : '') + '" data-action="heart-post" data-post-id="' + escapeHtml(post.id) + '" aria-label="Heart post">' + (post.heartedByOther ? '♥' : '♡') + '</button>' : '<span class="heart-state">' + (post.heartedByOther ? '♥ hearted' : '') + '</span>',
-        post.type === 'voice' ? '<button class="text-action" data-action="log-voice-diagnostic" data-post-id="' + escapeHtml(post.id) + '">debug voice</button>' : '',
         '</div>',
         post.canDelete ? '<button class="text-action" data-action="delete-post" data-post-id="' + escapeHtml(post.id) + '">delete</button>' : '<span></span>',
         '</footer>',
@@ -727,17 +725,6 @@
           state.feed.voiceLoading[postId] = false;
           render();
         });
-    }
-
-    function logVoiceDiagnostic(postId, reason) {
-      if (!postId) return Promise.resolve();
-      logClientDiagnostic('voice_diagnostic_requested', { postId: postId, message: reason || '' });
-      return apiGet('getVoiceDiagnostics', { postId: postId }).catch(function(err) {
-        logClientDiagnostic('voice_diagnostic_failed', {
-          postId: postId,
-          message: String(err && err.message || err)
-        });
-      });
     }
 
     function renderComposer() {
@@ -1323,27 +1310,6 @@
           const postId = button.getAttribute('data-post-id');
           loadVoiceData(postId);
         });
-      });
-
-      root.querySelectorAll('[data-action="log-voice-diagnostic"]').forEach(function(button) {
-        button.addEventListener('click', function() {
-          const postId = button.getAttribute('data-post-id');
-          button.disabled = true;
-          button.textContent = 'Logged';
-          logVoiceDiagnostic(postId, 'manual_button');
-        });
-      });
-
-      root.querySelectorAll('.voice-frame').forEach(function(frame) {
-        frame.addEventListener('load', function() {
-          const postId = frame.getAttribute('data-post-id');
-          if (!postId || state.feed.voiceFrameLogged[postId]) return;
-          state.feed.voiceFrameLogged[postId] = true;
-          logClientDiagnostic('voice_drive_frame_loaded', {
-            postId: postId,
-            frameSrcPresent: Boolean(frame.getAttribute('src'))
-          });
-        }, { once: true });
       });
 
       root.querySelectorAll('.voice-player').forEach(function(player) {
