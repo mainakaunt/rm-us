@@ -97,7 +97,6 @@
       render();
       loadToday();
       loadActiveTabData();
-      loadActivityStats();
       window.addEventListener('scroll', maybeLoadMoreFeed, { passive: true });
       window.addEventListener('resize', setupMobileViewport, { passive: true });
       window.addEventListener('popstate', function() {
@@ -379,7 +378,6 @@
       ].join('');
       bindEvents();
       scrollToPendingFocus();
-      drawAllVoiceWaveforms();
     }
 
     function renderActiveTab() {
@@ -398,7 +396,7 @@
       const otherUser = state.today && state.today.otherUser;
       const lastSeenAt = otherUser && otherUser.lastSeenAt;
       const lastSeenText = lastSeenAt ? 'seen ' + relativeTime(lastSeenAt) : '';
-      const themeIcon = state.ui.theme === 'dark' ? '☀' : state.ui.theme === 'light' ? '◑' : '◑';
+      const themeIcon = state.ui.theme === 'dark' ? '☀' : state.ui.theme === 'light' ? '☽' : '◑';
       const clocksHtml = clocks.map(function(clock) {
         const weather = clock.weather ? ' · ' + clock.weather.temperatureC + '°C ' + clock.weather.summary : '';
         return '<span class="clock"><em>' + escapeHtml(clock.name) + '</em> ' + escapeHtml(clock.time + weather) + '</span>';
@@ -432,7 +430,6 @@
         renderQuestionCard(today),
         renderDailyPhoto(today.dailyPhoto),
         renderStatusButtons(today),
-        renderHeatmap(),
         renderInstallTip()
       ].join('');
     }
