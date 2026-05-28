@@ -1,3 +1,4 @@
+/* build: 20260528-0813 */
 /* ===========================================================
    Us — Postmark
    Warm paper, terracotta band, hand-stamped meta, postcard posts.
@@ -45,64 +46,14 @@
   --tabbar-h: 72px;
 }
 
-/* Dark mode — automatic (OS preference) and manual toggle */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --paper:        #1A1108;
-    --paper-warm:   #201510;
-    --paper-bright: #261A0F;
-    --paper-shade:  #130D06;
-    --ink:          #F0E4CE;
-    --ink-soft:     #BFA98A;
-    --ink-mute:     #8A7462;
-    --ink-faint:    #5D4D3E;
-    --mark:         #E07856;
-    --mark-deep:    #B14228;
-    --mark-soft:    #F09878;
-    --cream:        #F0E4CE;
-    --rule:         rgba(240,228,206,0.10);
-    --rule-strong:  rgba(240,228,206,0.18);
-    --rule-dash:    rgba(240,228,206,0.22);
+  :root {
+    /* Keep paper light always — the brand is paper. Just slightly warmer. */
+    --paper:        #EBE0CF;
+    --paper-warm:   #F4ECDA;
+    --paper-bright: #FAF1DE;
+    --paper-shade:  #DFD2BB;
   }
-  :root:not([data-theme="light"]) body {
-    background-image:
-      radial-gradient(circle at 6% -4%, rgba(177,66,40,0.18), transparent 32%),
-      radial-gradient(circle at 100% 100%, rgba(177,66,40,0.12), transparent 38%),
-      repeating-linear-gradient(0deg, rgba(240,228,206,0.025) 0 1px, transparent 1px 4px);
-  }
-}
-:root[data-theme="dark"] {
-  --paper:        #1A1108;
-  --paper-warm:   #201510;
-  --paper-bright: #261A0F;
-  --paper-shade:  #130D06;
-  --ink:          #F0E4CE;
-  --ink-soft:     #BFA98A;
-  --ink-mute:     #8A7462;
-  --ink-faint:    #5D4D3E;
-  --mark:         #E07856;
-  --mark-deep:    #B14228;
-  --mark-soft:    #F09878;
-  --cream:        #F0E4CE;
-  --rule:         rgba(240,228,206,0.10);
-  --rule-strong:  rgba(240,228,206,0.18);
-  --rule-dash:    rgba(240,228,206,0.22);
-}
-:root[data-theme="dark"] body {
-  background-image:
-    radial-gradient(circle at 6% -4%, rgba(177,66,40,0.18), transparent 32%),
-    radial-gradient(circle at 100% 100%, rgba(177,66,40,0.12), transparent 38%),
-    repeating-linear-gradient(0deg, rgba(240,228,206,0.025) 0 1px, transparent 1px 4px);
-}
-:root[data-theme="light"] {
-  --paper:        #EFE6D8;
-  --paper-warm:   #F8F0E1;
-  --paper-bright: #FCF7EC;
-  --paper-shade:  #E5D9C5;
-  --ink:          #2A1C12;
-  --ink-soft:     #5D4332;
-  --ink-mute:     #9A8470;
-  --ink-faint:    #BFAE96;
 }
 
 * { box-sizing: border-box; }
