@@ -846,36 +846,6 @@ p { color: var(--ink-soft); font-size: 15px; line-height: 1.5; }
 }
 .song-link::before { content: "♪"; font-size: 18px; }
 
-.voice-frame {
-  width: 100%;
-  height: 92px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  background: var(--paper-warm);
-  position: relative;
-  z-index: 1;
-}
-
-.voice-load {
-  width: 100%;
-  min-height: 46px;
-  border: 1px dashed var(--rule-dash);
-  border-radius: var(--radius);
-  background: var(--paper-warm);
-  color: var(--mark);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.voice-load.compact {
-  min-height: 34px;
-  font-size: 9px;
-  letter-spacing: 0.12em;
-}
-
 .voice-player, .voice-preview {
   width: 100%;
   height: 44px;
