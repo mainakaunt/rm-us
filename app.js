@@ -642,18 +642,10 @@
 
       if (post.type === 'voice') {
         const voice = state.feed.voiceData[post.id];
-        const loading = state.feed.voiceLoading[post.id];
-        const error = state.feed.voiceErrors[post.id];
-        const previewUrl = post.mediaPreviewUrl || post.mediaUrl || '';
+        const audioSrc = voice && voice.base64 ? voiceAudioSource(voice) : post.mediaDownloadUrl || post.mediaUrl || '';
         return [
           post.text ? '<p class="post-text">' + escapeHtml(post.text) + '</p>' : '',
-          voice && voice.base64
-            ? '<audio class="voice-player" controls preload="metadata" src="' + escapeHtml(voiceAudioSource(voice)) + '" data-post-id="' + escapeHtml(post.id) + '" data-audio-source="inline"></audio>'
-            : (!error && previewUrl
-              ? '<iframe class="voice-frame" src="' + escapeHtml(previewUrl) + '" loading="lazy" allow="autoplay" data-post-id="' + escapeHtml(post.id) + '"></iframe>'
-              : '<button class="voice-load" data-action="load-voice" data-post-id="' + escapeHtml(post.id) + '" ' + (loading ? 'disabled' : '') + '>' + (loading ? 'Loading voice note...' : 'Load voice note') + '</button>'),
-          previewUrl && !voice ? '<button class="voice-load compact" data-action="load-voice" data-post-id="' + escapeHtml(post.id) + '" ' + (loading ? 'disabled' : '') + '>' + (loading ? 'Loading fallback...' : 'Try fallback player') + '</button>' : '',
-          error ? '<p class="voice-error">' + escapeHtml(error) + '</p>' : '',
+          audioSrc ? '<audio class="voice-player" controls preload="metadata" src="' + escapeHtml(audioSrc) + '" data-post-id="' + escapeHtml(post.id) + '"></audio>' : '',
           post.mediaDownloadUrl ? '<a class="voice-open-link" href="' + escapeHtml(post.mediaDownloadUrl) + '" target="_blank" rel="noopener">Open if it will not play</a>' : ''
         ].join('');
       }
@@ -1315,6 +1307,10 @@
       root.querySelectorAll('.voice-player').forEach(function(player) {
         player.addEventListener('error', function() {
           const postId = player.getAttribute('data-post-id');
+          if (!state.feed.voiceData[postId]) {
+            loadVoiceData(postId, 'native_audio_error');
+            return;
+          }
           const voice = state.feed.voiceData[postId];
           const mimeTypes = voice && Array.isArray(voice.mimeTypes) ? voice.mimeTypes : [];
           const nextIndex = Number(voice && voice.candidateIndex || 0) + 1;
