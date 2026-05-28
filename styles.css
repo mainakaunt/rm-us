@@ -70,6 +70,13 @@
       radial-gradient(circle at 100% 100%, rgba(177,66,40,0.12), transparent 38%),
       repeating-linear-gradient(0deg, rgba(240,228,206,0.025) 0 1px, transparent 1px 4px);
   }
+  /* Inverted-surface elements that use --ink as bg in light mode */
+  :root:not([data-theme="light"]) .tabbar { background: var(--paper-shade); box-shadow: 0 -16px 40px -22px rgba(0,0,0,0.6); }
+  :root:not([data-theme="light"]) .tab { color: var(--ink-mute); }
+  :root:not([data-theme="light"]) .tab.active { background: var(--mark); color: var(--cream); }
+  :root:not([data-theme="light"]) .toast { background: var(--paper-bright); color: var(--ink); border: 1px solid var(--rule-strong); }
+  :root:not([data-theme="light"]) .mini-action { background: var(--paper-bright); color: var(--ink); border: 1px solid var(--rule-strong); }
+  :root:not([data-theme="light"]) .mini-action.muted { background: transparent; border-color: var(--rule-strong); color: var(--ink-soft); }
 }
 :root[data-theme="dark"] {
   --paper:        #1A1108;
@@ -94,6 +101,12 @@
     radial-gradient(circle at 100% 100%, rgba(177,66,40,0.12), transparent 38%),
     repeating-linear-gradient(0deg, rgba(240,228,206,0.025) 0 1px, transparent 1px 4px);
 }
+:root[data-theme="dark"] .tabbar { background: var(--paper-shade); box-shadow: 0 -16px 40px -22px rgba(0,0,0,0.6); }
+:root[data-theme="dark"] .tab { color: var(--ink-mute); }
+:root[data-theme="dark"] .tab.active { background: var(--mark); color: var(--cream); }
+:root[data-theme="dark"] .toast { background: var(--paper-bright); color: var(--ink); border: 1px solid var(--rule-strong); }
+:root[data-theme="dark"] .mini-action { background: var(--paper-bright); color: var(--ink); border: 1px solid var(--rule-strong); }
+:root[data-theme="dark"] .mini-action.muted { background: transparent; border-color: var(--rule-strong); color: var(--ink-soft); }
 :root[data-theme="light"] {
   --paper:        #EFE6D8;
   --paper-warm:   #F8F0E1;
