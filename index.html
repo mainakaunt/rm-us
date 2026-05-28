@@ -9,9 +9,11 @@
     <meta name="apple-mobile-web-app-title" content="R&M">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <style>
-      html, body { min-height: 100%; background: #E07856; }
-      #splash { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: #E07856; }
-      #splash > span { color: #FAFAF7; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 64px; font-weight: 500; }
+      html, body { min-height: 100%; background: #EFE6D8; margin: 0; }
+      #splash { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: #B14228; background-image: radial-gradient(circle at 50% 35%, #C95D44, #B14228 60%, #8E3320 110%); }
+      .splash-stamp { display: grid; gap: 14px; justify-items: center; padding: 36px 56px; border: 1.5px solid rgba(244,233,214,0.55); outline: 1px dashed rgba(244,233,214,0.4); outline-offset: 8px; transform: rotate(-3deg); }
+      .splash-mark { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 96px; line-height: 1; color: #F4E9D6; letter-spacing: -0.04em; }
+      .splash-postmark { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(244,233,214,0.85); }
     </style>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
@@ -25,7 +27,10 @@
   </head>
   <body>
     <div id="splash" class="splash" aria-hidden="true">
-      <span>Us.</span>
+      <div class="splash-stamp">
+        <span class="splash-mark">us</span>
+        <span class="splash-postmark">— a private letter —</span>
+      </div>
     </div>
     <main id="app" class="app-shell" aria-live="polite"></main>
     <script src="app.js"></script>
