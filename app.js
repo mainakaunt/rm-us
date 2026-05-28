@@ -1,3 +1,4 @@
+/* build: 20260528-0813 */
 (function() {
     const root = document.getElementById('app');
     const bootstrap = window.__BOOTSTRAP__ || {};
@@ -708,10 +709,6 @@
         })
         .catch(function(err) {
           state.feed.voiceErrors[postId] = humanError(err.message);
-          logClientDiagnostic('voice_load_failed', {
-            postId: postId,
-            message: String(err && err.message || err)
-          });
         })
         .finally(function() {
           state.feed.voiceLoading[postId] = false;
@@ -1314,11 +1311,6 @@
           const voice = state.feed.voiceData[postId];
           const mimeTypes = voice && Array.isArray(voice.mimeTypes) ? voice.mimeTypes : [];
           const nextIndex = Number(voice && voice.candidateIndex || 0) + 1;
-          logClientDiagnostic('voice_inline_audio_error', {
-            postId: postId,
-            mimeType: mimeTypes[Number(voice && voice.candidateIndex || 0)] || '',
-            mediaError: player.error ? player.error.code : ''
-          });
           if (voice && nextIndex < mimeTypes.length) {
             voice.candidateIndex = nextIndex;
             state.feed.voiceErrors[postId] = '';
@@ -2294,15 +2286,6 @@
     function apiPost(action, payload) {
       if (externalFrontend) return externalApi('post', action, payload || {});
       return gasRun('clientApiPost', Object.assign({ action: action }, payload || {}));
-    }
-
-    function logClientDiagnostic(reason, details) {
-      const payload = Object.assign({
-        reason: reason,
-        userAgent: navigator.userAgent,
-        standalone: String(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone || '')
-      }, details || {});
-      apiPost('logClientDiagnostic', payload).catch(function() {});
     }
 
     function externalApi(method, action, payload) {
