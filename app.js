@@ -1,4 +1,4 @@
-/* build: 20260528-0813 */
+/* build: 20260528-0836 */
 (function() {
     const root = document.getElementById('app');
     const bootstrap = window.__BOOTSTRAP__ || {};
@@ -693,13 +693,14 @@
       return new Blob(chunks, { type: mimeType || 'audio/mp4' });
     }
 
-    function loadVoiceData(postId, reason) {
+    function loadVoiceData(postId, options) {
+      const opts = options || {};
       if (!postId || state.feed.voiceLoading[postId]) return Promise.resolve();
       if (state.feed.voiceData[postId] && state.feed.voiceData[postId].base64) return Promise.resolve();
 
       state.feed.voiceLoading[postId] = true;
-      state.feed.voiceErrors[postId] = reason === 'drive_audio_error' ? 'Loading voice note...' : '';
-      render();
+      state.feed.voiceErrors[postId] = '';
+      if (!opts.silent) render();
 
       return apiGet('getVoiceData', { postId: postId })
         .then(function(result) {
@@ -1302,10 +1303,16 @@
       });
 
       root.querySelectorAll('.voice-player').forEach(function(player) {
+        player.addEventListener('pointerdown', function() {
+          const postId = player.getAttribute('data-post-id');
+          if (postId && !state.feed.voiceData[postId]) {
+            loadVoiceData(postId, { silent: true });
+          }
+        }, { once: true });
+
         player.addEventListener('error', function() {
           const postId = player.getAttribute('data-post-id');
           if (!state.feed.voiceData[postId]) {
-            loadVoiceData(postId, 'native_audio_error');
             return;
           }
           const voice = state.feed.voiceData[postId];
