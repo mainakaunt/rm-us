@@ -19,10 +19,7 @@
         loaded: false,
         voiceData: {},
         voiceLoading: {},
-        voiceErrors: {},
-        search: '',
-        searchOpen: false,
-        galleryMode: false
+        voiceErrors: {}
       },
       composer: {
         open: false,
@@ -54,27 +51,15 @@
       ui: {
         showNotificationBanner: false,
         showInstallTip: false,
-        revealAnswers: false,
-        theme: '',
-        showInbox: false,
-        exporting: false
-      },
-      stats: null
+        revealAnswers: false
+      }
     };
 
     let serviceWorkerReadyPromise = Promise.resolve(null);
     let pendingRouteFocus = '';
 
-    function applyTheme(theme) {
-      state.ui.theme = theme || '';
-      if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
-      else if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
-      else document.documentElement.removeAttribute('data-theme');
-    }
-
     function init() {
       document.documentElement.style.setProperty('--accent', config.accent_color || '#E07856');
-      applyTheme(localStorage.getItem('us_theme') || '');
       setupMobileViewport();
       if (externalFrontend && !user) {
         initExternalFrontend();
@@ -373,7 +358,6 @@
         renderTabs(),
         state.activeTab === 'feed' ? '<button class="fab" data-action="open-composer" aria-label="Create post">+</button>' : '',
         state.composer.open ? renderComposer() : '',
-        state.ui.showInbox ? '<div class="inbox-overlay" data-action="close-inbox"></div>' + renderInbox() : '',
         state.error ? '<div class="toast">' + escapeHtml(state.error) + '</div>' : ''
       ].join('');
       bindEvents();
@@ -393,20 +377,10 @@
         { name: config.user_a_name || 'Max', time: '--:--' },
         { name: config.user_b_name || 'Rui', time: '--:--' }
       ];
-      const otherUser = state.today && state.today.otherUser;
-      const lastSeenAt = otherUser && otherUser.lastSeenAt;
-      const lastSeenText = lastSeenAt ? 'seen ' + relativeTime(lastSeenAt) : '';
-      const themeIcon = state.ui.theme === 'dark' ? '☀' : state.ui.theme === 'light' ? '☽' : '◑';
-      const clocksHtml = clocks.map(function(clock) {
+      return '<div class="clock-strip">' + clocks.map(function(clock) {
         const weather = clock.weather ? ' · ' + clock.weather.temperatureC + '°C ' + clock.weather.summary : '';
         return '<span class="clock"><em>' + escapeHtml(clock.name) + '</em> ' + escapeHtml(clock.time + weather) + '</span>';
-      }).join('<span class="dot" aria-hidden="true"></span>');
-      const actionsHtml = '<span class="clock-actions">' +
-        (lastSeenText ? '<span class="clock-seen">' + escapeHtml(lastSeenText) + '</span>' : '') +
-        '<button class="clock-icon-btn" data-action="toggle-inbox" aria-label="Notifications">🔔</button>' +
-        '<button class="clock-icon-btn" data-action="toggle-theme" aria-label="Toggle theme">' + themeIcon + '</button>' +
-        '</span>';
-      return '<div class="clock-strip">' + clocksHtml + actionsHtml + '</div>';
+      }).join('<span class="dot" aria-hidden="true"></span>') + '</div>';
     }
 
     function renderToday() {
@@ -624,56 +598,13 @@
         ].join('');
       }
 
-      const needle = state.feed.search.trim().toLowerCase();
-      const visibleItems = needle
-        ? state.feed.items.filter(function(post) {
-            return (post.text || '').toLowerCase().indexOf(needle) !== -1 ||
-              (post.authorName || '').toLowerCase().indexOf(needle) !== -1;
-          })
-        : state.feed.items;
-
-      if (state.feed.galleryMode) {
-        return renderFeedControls() + renderPhotoGallery(visibleItems);
-      }
-
       return [
-        renderFeedControls(),
         '<section class="feed-list">',
-        visibleItems.map(renderFeedPost).join(''),
-        needle && !visibleItems.length ? '<p class="feed-loading">— no results</p>' : '',
+        state.feed.items.map(renderFeedPost).join(''),
         state.feed.loadingMore ? '<p class="feed-loading">— loading more</p>' : '',
-        !needle && !state.feed.hasMore ? '<p class="feed-loading">— caught up</p>' : '',
+        !state.feed.hasMore ? '<p class="feed-loading">— caught up</p>' : '',
         '</section>'
       ].join('');
-    }
-
-    function renderFeedControls() {
-      const searchActive = state.feed.searchOpen ? ' active' : '';
-      const galleryActive = state.feed.galleryMode ? ' active' : '';
-      return [
-        '<div class="feed-controls">',
-        '<button class="feed-ctrl' + searchActive + '" data-action="toggle-feed-search" aria-label="Search">🔍</button>',
-        '<div class="feed-search-wrap' + (state.feed.searchOpen ? ' open' : '') + '">',
-        '<input class="feed-search-input" type="search" placeholder="search posts…" value="' + escapeHtml(state.feed.search) + '" data-action="feed-search-input" autocomplete="off">',
-        '</div>',
-        '<button class="feed-ctrl' + galleryActive + '" data-action="toggle-gallery" aria-label="Gallery view">⊞</button>',
-        '</div>'
-      ].join('');
-    }
-
-    function renderPhotoGallery(items) {
-      const photos = items.filter(function(p) { return p.type === 'photo'; });
-      if (!photos.length) {
-        return '<div class="gallery-empty">no photos yet</div>';
-      }
-      return '<div class="photo-gallery">' + photos.map(function(post) {
-        return [
-          '<figure class="gallery-item" data-post-id="' + escapeHtml(post.id) + '" data-action="go-to-feed">',
-          '<img src="' + escapeHtml(post.mediaUrl) + '" alt="Shared photo" loading="lazy" data-drive-id="' + escapeHtml(post.mediaDriveId || '') + '">',
-          '<figcaption>' + escapeHtml(postmarkTime(post.createdAt)) + '</figcaption>',
-          '</figure>'
-        ].join('');
-      }).join('') + '</div>';
     }
 
     function renderFeedPost(post) {
@@ -714,10 +645,7 @@
         const audioSrc = voice && voice.base64 ? voiceAudioSource(voice) : post.mediaDownloadUrl || post.mediaUrl || '';
         return [
           post.text ? '<p class="post-text">' + escapeHtml(post.text) + '</p>' : '',
-          '<div class="voice-container">',
-          '<canvas class="voice-waveform" data-post-id="' + escapeHtml(post.id) + '" height="40"></canvas>',
           audioSrc ? '<audio class="voice-player" controls preload="metadata" src="' + escapeHtml(audioSrc) + '" data-post-id="' + escapeHtml(post.id) + '"></audio>' : '',
-          '</div>',
           post.mediaDownloadUrl ? '<a class="voice-open-link" href="' + escapeHtml(post.mediaDownloadUrl) + '" target="_blank" rel="noopener">Open if it will not play</a>' : ''
         ].join('');
       }
@@ -1056,7 +984,6 @@
           '<button class="primary wide" data-action="show-memory">Check again</button>',
           '</article>',
           renderCapsules(),
-          renderExportSection(),
           '</section>'
         ].join('');
       }
@@ -1066,7 +993,6 @@
         renderMemoryCard(state.memories.memory),
         '<div style="padding:0 22px;"><button class="primary wide" data-action="show-memory">Show me another</button></div>',
         renderCapsules(),
-        renderExportSection(),
         '</section>'
       ].join('');
     }
@@ -1122,190 +1048,11 @@
       return '<section class="placeholder"><h2>' + titleCase(state.activeTab) + '</h2><p>coming soon.</p></section>';
     }
 
-    function renderHeatmap() {
-      if (!state.stats || !state.stats.days || !state.stats.days.length) return '';
-      const days = state.stats.days;
-      const cells = days.map(function(d) {
-        const level = d.bothAnswered ? 4 : d.meAnswered && d.hasPosts ? 3 : d.meAnswered || d.otherAnswered ? 2 : d.hasPosts ? 1 : 0;
-        return '<div class="hm-day' + (level ? ' l' + level : '') + '" title="' + escapeHtml(d.date) + '"></div>';
-      }).join('');
-      return [
-        '<div class="heatmap-wrap">',
-        '<div class="heatmap-label">Activity — last 91 days</div>',
-        '<div class="heatmap-grid">' + cells + '</div>',
-        '</div>'
-      ].join('');
-    }
-
-    function renderInbox() {
-      const today = state.today;
-      const items = [];
-      if (today) {
-        if (today.question && today.question.partnerAnswer && !today.question.myAnswer) {
-          items.push({ icon: '✍', title: escapeHtml((today.otherUser && today.otherUser.name) || 'Partner') + ' answered today', body: 'Your turn to answer.', time: '', action: 'today' });
-        }
-        if (today.otherUser && today.otherUser.lastSeenAt) {
-          items.push({ icon: '👁', title: 'Last seen', body: relativeTime(today.otherUser.lastSeenAt), time: '', action: '' });
-        }
-      }
-      const unreadCount = hasUnreadFeed() ? 1 : 0;
-      if (unreadCount) {
-        items.push({ icon: '📬', title: 'New posts in feed', body: 'Tap to view.', time: '', action: 'feed' });
-      }
-      return [
-        '<div class="inbox-panel" role="dialog" aria-label="Notifications">',
-        '<header class="inbox-header">',
-        '<span>— inbox</span>',
-        '<button class="inbox-close" data-action="close-inbox" aria-label="Close">✕</button>',
-        '</header>',
-        '<div class="inbox-scroll">',
-        items.length ? items.map(function(item) {
-          const actionAttr = item.action ? ' data-action="inbox-go" data-tab="' + escapeHtml(item.action) + '"' : '';
-          return '<div class="inbox-row"' + actionAttr + '>' +
-            '<span class="inbox-icon">' + item.icon + '</span>' +
-            '<div class="inbox-content"><strong>' + item.title + '</strong><p>' + item.body + '</p></div>' +
-            (item.time ? '<span class="inbox-time">' + escapeHtml(item.time) + '</span>' : '') +
-            '</div>';
-        }).join('') : '<p class="inbox-empty">all caught up ✓</p>',
-        '</div>',
-        '</div>'
-      ].join('');
-    }
-
-    function renderExportSection() {
-      return [
-        '<div class="export-section">',
-        '<div class="eyebrow"><span>— data export</span></div>',
-        '<p class="export-desc">Download all your answers, posts, bucket list, reunions, and time capsules as JSON.</p>',
-        '<button class="primary wide" data-action="export-data"' + (state.ui.exporting ? ' disabled' : '') + '>',
-        state.ui.exporting ? 'Exporting…' : 'Export everything',
-        '</button>',
-        '</div>'
-      ].join('');
-    }
-
-    function hasUnreadFeed() {
-      if (!state.feed.items.length) return false;
-      const lastSeen = localStorage.getItem('us_feed_last_seen');
-      if (!lastSeen) return true;
-      const newest = state.feed.items[0];
-      return newest && newest.createdAt && newest.createdAt > lastSeen;
-    }
-
-    function markFeedSeen() {
-      if (!state.feed.items.length) return;
-      const newest = state.feed.items[0];
-      if (newest && newest.createdAt) localStorage.setItem('us_feed_last_seen', newest.createdAt);
-    }
-
-    function loadActivityStats() {
-      apiGet('getActivitySummary')
-        .then(function(result) {
-          if (!result.ok) return;
-          state.stats = result.data;
-          if (state.activeTab === 'today') render();
-        })
-        .catch(function() {});
-    }
-
-    function drawAllVoiceWaveforms() {
-      root.querySelectorAll('canvas.voice-waveform').forEach(function(canvas) {
-        const postId = canvas.getAttribute('data-post-id');
-        const voice = state.feed.voiceData[postId];
-        if (voice && voice.base64) {
-          renderVoiceWaveform(canvas, voice.base64);
-        } else {
-          renderVoiceWaveformPlaceholder(canvas);
-        }
-      });
-    }
-
-    function renderVoiceWaveformPlaceholder(canvas) {
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      const w = canvas.offsetWidth || 240;
-      const h = 40;
-      canvas.width = w;
-      canvas.height = h;
-      const barCount = Math.floor(w / 5);
-      const barW = 3;
-      const gap = 2;
-      const seed = canvas.getAttribute('data-post-id') || '';
-      function pseudoRand(i) {
-        let x = 0;
-        for (let j = 0; j < seed.length; j++) x = (x * 31 + seed.charCodeAt(j) + i * 7) & 0xFFFF;
-        return (x & 0xFF) / 255;
-      }
-      ctx.clearRect(0, 0, w, h);
-      const style = getComputedStyle(document.documentElement);
-      const color = style.getPropertyValue('--ink-faint').trim() || 'rgba(42,28,18,0.25)';
-      ctx.fillStyle = color;
-      for (let i = 0; i < barCount; i++) {
-        const amp = 0.15 + pseudoRand(i) * 0.7;
-        const barH = Math.max(3, amp * (h - 4));
-        const x = i * (barW + gap);
-        const y = (h - barH) / 2;
-        ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(x, y, barW, barH, 1) : ctx.rect(x, y, barW, barH);
-        ctx.fill();
-      }
-    }
-
-    function renderVoiceWaveform(canvas, base64) {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext) { renderVoiceWaveformPlaceholder(canvas); return; }
-      try {
-        const clean = String(base64 || '').replace(/^data:[^,]+,/, '');
-        const binary = atob(clean);
-        const buffer = new ArrayBuffer(binary.length);
-        const view = new Uint8Array(buffer);
-        for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
-        const ctx = new AudioContext();
-        ctx.decodeAudioData(buffer, function(audioBuffer) {
-          const data = audioBuffer.getChannelData(0);
-          const w = canvas.offsetWidth || 240;
-          const h = 40;
-          canvas.width = w;
-          canvas.height = h;
-          const barCount = Math.floor(w / 5);
-          const barW = 3;
-          const gap = 2;
-          const step = Math.floor(data.length / barCount);
-          const cctx = canvas.getContext('2d');
-          if (!cctx) return;
-          const style2 = getComputedStyle(document.documentElement);
-          const color = style2.getPropertyValue('--mark').trim() || '#B14228';
-          cctx.fillStyle = color;
-          cctx.clearRect(0, 0, w, h);
-          for (let i = 0; i < barCount; i++) {
-            let max = 0;
-            for (let j = 0; j < step; j++) {
-              const v = Math.abs(data[i * step + j] || 0);
-              if (v > max) max = v;
-            }
-            const barH = Math.max(3, max * (h - 4));
-            const x = i * (barW + gap);
-            const y = (h - barH) / 2;
-            cctx.beginPath();
-            cctx.roundRect ? cctx.roundRect(x, y, barW, barH, 1) : cctx.rect(x, y, barW, barH);
-            cctx.fill();
-          }
-          ctx.close();
-        }, function() {
-          renderVoiceWaveformPlaceholder(canvas);
-        });
-      } catch (e) {
-        renderVoiceWaveformPlaceholder(canvas);
-      }
-    }
-
     function renderTabs() {
       const labels = { today: 'Today', feed: 'Feed', us: 'Us', memories: 'Memo.' };
       return '<nav class="tabbar">' + ['today', 'feed', 'us', 'memories'].map(function(tab) {
         const active = state.activeTab === tab ? ' active' : '';
-        const badge = tab === 'feed' && state.activeTab !== 'feed' && hasUnreadFeed()
-          ? '<span class="tab-badge" aria-hidden="true"></span>' : '';
-        return '<button class="tab' + active + '" data-tab="' + tab + '">' + labels[tab] + badge + '</button>';
+        return '<button class="tab' + active + '" data-tab="' + tab + '">' + labels[tab] + '</button>';
       }).join('') + '</nav>';
     }
 
@@ -1632,94 +1379,6 @@
         });
       });
 
-      const toggleTheme = root.querySelector('[data-action="toggle-theme"]');
-      if (toggleTheme) {
-        toggleTheme.addEventListener('click', function() {
-          const next = state.ui.theme === 'dark' ? 'light' : state.ui.theme === 'light' ? '' : 'dark';
-          applyTheme(next);
-          if (next) localStorage.setItem('us_theme', next);
-          else localStorage.removeItem('us_theme');
-          render();
-        });
-      }
-
-      const toggleInbox = root.querySelector('[data-action="toggle-inbox"]');
-      if (toggleInbox) {
-        toggleInbox.addEventListener('click', function() {
-          state.ui.showInbox = !state.ui.showInbox;
-          render();
-        });
-      }
-
-      document.querySelectorAll('[data-action="close-inbox"]').forEach(function(el) {
-        el.addEventListener('click', function() {
-          state.ui.showInbox = false;
-          render();
-        });
-      });
-
-      const toggleSearch = root.querySelector('[data-action="toggle-feed-search"]');
-      if (toggleSearch) {
-        toggleSearch.addEventListener('click', function() {
-          state.feed.searchOpen = !state.feed.searchOpen;
-          if (!state.feed.searchOpen) state.feed.search = '';
-          render();
-          if (state.feed.searchOpen) {
-            const inp = root.querySelector('.feed-search-input');
-            if (inp) inp.focus();
-          }
-        });
-      }
-
-      const searchInput = root.querySelector('.feed-search-input');
-      if (searchInput) {
-        searchInput.addEventListener('input', function() {
-          state.feed.search = searchInput.value;
-          render();
-        });
-      }
-
-      const toggleGallery = root.querySelector('[data-action="toggle-gallery"]');
-      if (toggleGallery) {
-        toggleGallery.addEventListener('click', function() {
-          state.feed.galleryMode = !state.feed.galleryMode;
-          render();
-        });
-      }
-
-      root.querySelectorAll('[data-action="go-to-feed"]').forEach(function(el) {
-        el.addEventListener('click', function() {
-          state.feed.galleryMode = false;
-          render();
-        });
-      });
-
-      const exportBtn = root.querySelector('[data-action="export-data"]');
-      if (exportBtn) {
-        exportBtn.addEventListener('click', function() {
-          if (state.ui.exporting) return;
-          state.ui.exporting = true;
-          render();
-          apiGet('getExport')
-            .then(function(result) {
-              if (!result.ok) throw new Error(result.error || 'Export failed');
-              const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = 'us-export-' + new Date().toISOString().slice(0, 10) + '.json';
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
-            })
-            .catch(function(err) { showToast(humanError(err.message)); })
-            .finally(function() {
-              state.ui.exporting = false;
-              render();
-            });
-        });
-      }
     }
 
     function setupGlobalTapFallbacks() {
@@ -1748,13 +1407,6 @@
             render();
           }
 
-          if (action === 'inbox-go') {
-            event.preventDefault();
-            const tab = target.getAttribute('data-tab');
-            state.ui.showInbox = false;
-            if (tab) activateTab(tab, true);
-            render();
-          }
         }, true);
       });
     }
@@ -2348,7 +2000,6 @@
     function activateTab(tab, updateUrl) {
       if (['today', 'feed', 'us', 'memories'].indexOf(tab) === -1) return;
       state.activeTab = tab;
-      if (tab === 'feed') markFeedSeen();
       if (updateUrl && window.history && window.history.pushState) {
         const nextUrl = new URL(window.location.href);
         nextUrl.searchParams.set('tab', tab);
@@ -2757,9 +2408,7 @@
         capsule_text_required: 'Write the letter first.',
         capsule_unlock_required: 'Choose an unlock date.',
         capsule_not_found: 'That letter is gone.',
-        capsule_locked: 'That letter is still sealed.',
-        reunion_end_before_start: 'The end date must be after the start date.',
-        capsule_date_must_be_future: 'The unlock date must be in the future.'
+        capsule_locked: 'That letter is still sealed.'
       };
       if (/failed to fetch|network/i.test(String(error || ''))) {
         return "Couldn't reach the sheet. Try again in a sec.";
