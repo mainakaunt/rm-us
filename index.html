@@ -1,12 +1,18 @@
+
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#B14228">
+    <meta name="theme-color" content="#E07856">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="R&M">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <style>
+      html, body { min-height: 100%; background: #E07856; }
+      #splash { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: #E07856; }
+      #splash > span { color: #FAFAF7; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 64px; font-weight: 500; }
+    </style>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
     <link rel="icon" type="image/svg+xml" href="assets/icon.svg">
@@ -19,10 +25,7 @@
   </head>
   <body>
     <div id="splash" class="splash" aria-hidden="true">
-      <div class="splash-stamp">
-        <span class="splash-mark">us</span>
-        <span class="splash-postmark">— a private letter —</span>
-      </div>
+      <span>Us.</span>
     </div>
     <main id="app" class="app-shell" aria-live="polite"></main>
     <script src="app.js"></script>
