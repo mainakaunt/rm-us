@@ -1,7 +1,7 @@
 {
   "name": "Us",
   "short_name": "R&M",
-  "id": "?app=rm-us",
+  "id": "/rm-us/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
